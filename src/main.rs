@@ -132,12 +132,13 @@ fn proth_gmp(n : Proth) -> (Integer, Integer) {
 
 fn main() {
     let matches = App::new("Hazel's Primality Tester")
-        .version("0.0")
+        .version("0.1.0")
         .author("Hazel Victoria Campbell")
         .about("Tests Proth numbers for primality")
         .arg(Arg::with_name("number")
             .index(1)
             .required(true)
+            .help("A proth number of the format 943*2^3442990+1")
         ).get_matches();
     assert!(matches.is_present("number"));
     let number_s : &str = matches.value_of("number").expect("What");
