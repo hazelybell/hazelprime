@@ -18,7 +18,7 @@ fn u32_from_cstr(input: CompleteStr) -> Result<u32, std::num::ParseIntError> {
     u32::from_str(input.as_ref())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Proth {
     pub t: u32,
     pub e: u32, 
@@ -62,7 +62,7 @@ named!(parse_proth<CompleteStr, Proth>,
     )
 );
 
-fn proth_gmp_simple(n : Proth) {
+fn proth_gmp_simple(n : Proth) -> (Integer, Integer) {
     let two_to_the_e : Integer = Integer::from(Integer::u_pow_u(2, n.e));
     let n_full : Integer = two_to_the_e * n.t + 1;
     let n_minus_one_over_two : Integer = Integer::from(&n_full - 1) / 2;
@@ -78,16 +78,17 @@ fn proth_gmp_simple(n : Proth) {
         gmp::mpz_powm(r_ptr, a_ptr, n_minus_one_over_two_ptr, n_full_ptr);
     }
     println!("Done powm");
-    let r_minus_p : Integer = r - n_full;
+    let r_minus_p : Integer = &r - n_full;
     println!("{:?}", r_minus_p);
     if r_minus_p == -1 {
         println!("Prime");
     } else {
         println!("Not prime");
     }
+    return (r, r_minus_p);
 }
 
-fn proth_gmp(n : Proth) {
+fn proth_gmp(n : Proth) -> (Integer, Integer) {
     let two_to_the_e : Integer = Integer::from(Integer::u_pow_u(2, n.e));
     let n_full : Integer = two_to_the_e * n.t + 1;
     let n_minus_one_over_two : Integer = Integer::from(Integer::from(&n_full - 1) / 2);
@@ -131,8 +132,10 @@ fn proth_gmp(n : Proth) {
 //     let rr = Integer::pow_mod_ref(&r, &n_minus_one_over_two, &n_full).expect("Math error!");
 //     println!("{:?}", rr);
 //     let rrr = Integer::from(rr);
-    let r_minus_p : Integer = rr - n_full;
+    let r_minus_p : Integer = &rr - n_full;
+    let r : Integer = Integer::from(&rr);
     println!("{:?}", r_minus_p);
+    return (r, r_minus_p);
 }
 
 fn main() {
@@ -152,4 +155,35 @@ fn main() {
     let n : Proth =  number_parsed.expect("You must provide numbers in the format 943*2^3442990+1").1;
     println!("{:?}", n);
     proth_gmp(n);
+}
+
+// tests
+
+#[cfg(test)]
+mod tests {
+    use crate::{Proth, proth_gmp, proth_gmp_simple};
+    
+    #[test]
+    fn smoke() {
+        assert_eq!(2 + 2, 4);
+    }
+    #[test]
+    fn test_proth_gmp() {
+        let five = Proth { t: 1, e: 2 };
+        assert_eq!((proth_gmp(five)).1, -1);
+    }
+    #[test]
+    fn test_proth_gmp_2() {
+        let five_26607 = Proth { t: 5, e: 26607 };
+        assert_eq!((proth_gmp(five_26607)).1, -1);
+    }
+    #[test]
+    fn test_proth_gmp_3() {
+        let five_26606 = Proth { t: 5, e: 26606 };
+        let r = proth_gmp(five_26606);
+        let r_simple = proth_gmp_simple(five_26606);
+        assert_ne!(r.1, -1);
+        assert_eq!(r.0, r_simple.0);
+        assert_eq!(r.1, r_simple.1);
+    }
 }
