@@ -1,0 +1,10 @@
+[package]
+name = "hazelprime"
+version = "0.1.0"
+authors = ["Hazel Victoria Campbell <github@orezpraw.com>"]
+edition = "2018"
+
+[dependencies]
+rug = "1.3"
+nom = "4.2"
+clap = "~2.32.0"
