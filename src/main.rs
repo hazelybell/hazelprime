@@ -1,8 +1,6 @@
 use rug::Integer;
 use rug::Assign;
 use gmp_mpfr_sys::gmp;
-use std::mem;
-use std::os::raw::c_ulong;
 
 extern crate clap; 
 use clap::{Arg, App};
@@ -14,7 +12,7 @@ use nom::types::CompleteStr;
 use std::str::FromStr;
 use std::num::ParseIntError;
 
-fn u32_from_cstr(input: CompleteStr) -> Result<u32, std::num::ParseIntError> {
+fn u32_from_cstr(input: CompleteStr) -> Result<u32, ParseIntError> {
     u32::from_str(input.as_ref())
 }
 
@@ -72,7 +70,7 @@ fn proth_gmp_simple(n : Proth) -> (Integer, Integer) {
     let n_minus_one_over_two_ptr = n_minus_one_over_two.as_raw();
     let a_ptr = a.as_raw();
     let mut r = Integer::with_capacity((n_full.significant_bits() + a.significant_bits()) as usize);
-    let mut r_ptr = r.as_raw_mut();
+    let r_ptr = r.as_raw_mut();
     println!("Start powm");
     unsafe {
         gmp::mpz_powm(r_ptr, a_ptr, n_minus_one_over_two_ptr, n_full_ptr);
@@ -93,17 +91,11 @@ fn proth_gmp(n : Proth) -> (Integer, Integer) {
     let n_full : Integer = two_to_the_e * n.t + 1;
     let n_minus_one_over_two : Integer = Integer::from(Integer::from(&n_full - 1) / 2);
     println!("n: {:?} bts", n_full.significant_bits());
-    let a = Integer::from(3);
     let n_full_ptr = n_full.as_raw();
-    let n_minus_one_over_two_ptr = n_minus_one_over_two.as_raw();
-    let a_ptr = a.as_raw();
-    let a_ui : c_ulong = a.to_u32().expect("a too big").into();
-//     let mut r = Integer::with_capacity((n_full.significant_bits() + a.significant_bits()) as usize);
-//     let mut r_ptr = r.as_raw_mut();
     let mut rr = Integer::with_capacity((n_full.significant_bits() * 2) as usize);
-    let mut rr_ptr = rr.as_raw_mut();
+    let rr_ptr = rr.as_raw_mut();
     let mut ai = Integer::with_capacity((n_full.significant_bits() * 2) as usize);
-    let mut ai_ptr = ai.as_raw_mut();
+    let ai_ptr = ai.as_raw_mut();
     let original_capacity = ai.capacity();
     ai.assign(3);
     rr.assign(1);
