@@ -389,7 +389,7 @@ pub fn barrett(n : Proth) -> (Integer, Integer) {
 //             println!("ay_0: {}", *ay_0);
 //             gmp::mpn_tdiv_qr(q_0, ay_0, 0, ay_0, double_sz, n_0, n_sz);
             // div by n = multiply by 1/n
-            // q := (a * m) in barret reduction
+            // q := (a * m) in barrett reduction
             gmp::mpn_mul(q2_0, ay_0, a_sz, m_0, m_sz);
             let q2_last = *(q2_0.offset((q2_sz as isize) - 1));
             assert_eq!(q2_last, 0);
@@ -397,7 +397,7 @@ pub fn barrett(n : Proth) -> (Integer, Integer) {
             let n_last = *(n_0.offset((n_sz as isize) - 1));
             assert!(n_last > q2_last);
             
-            // >> k in barret reduction
+            // >> k in barrett reduction
             // compute q * n
 
             gmp::mpn_mul(qn_0, n_0, n_sz, q2_shifted, q2_shifted_sz);
@@ -438,3 +438,49 @@ pub fn barrett(n : Proth) -> (Integer, Integer) {
     return (rr, r_minus_p);
 }
 
+// tests
+
+#[cfg(test)]
+mod tests {
+    use crate::proth::Proth;
+    use crate::proth_gmp::{simple, low, medium, barrett};
+    
+    #[test]
+    fn smoke() {
+        assert_eq!(2 + 2, 4);
+    }
+    #[test]
+    fn test_simple() {
+        let five = Proth { t: 1, e: 2 };
+        assert_eq!((simple(five)).1, -1);
+    }
+    #[test]
+    fn test_medium() {
+        let five_26607 = Proth { t: 5, e: 26607 };
+        assert_eq!((medium(five_26607)).1, -1);
+    }
+    #[test]
+    fn test_low() {
+        let five_26606 = Proth { t: 5, e: 26606 };
+        let r = low(five_26606);
+        let r_simple = simple(five_26606);
+        assert_ne!(r.1, -1);
+        assert_eq!(r.0, r_simple.0);
+        assert_eq!(r.1, r_simple.1);
+    }
+    #[test]
+    fn test_barrett_comp() {
+        let five_26606 = Proth { t: 5, e: 26606 };
+        let r = barrett(five_26606);
+        let r_simple = simple(five_26606);
+        assert_ne!(r.1, -1);
+        assert_eq!(r.0, r_simple.0);
+        assert_eq!(r.1, r_simple.1);
+    }
+    #[test]
+    fn test_barrett_prime() {
+        let five_26607 = Proth { t: 5, e: 26607 };
+        let r = barrett(five_26607);
+        assert_eq!(r.1, -1);
+    }
+}

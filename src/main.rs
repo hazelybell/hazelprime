@@ -37,38 +37,8 @@ fn main() {
         "gmp_medium" => proth_gmp::medium(n),
         "gmp_low" => proth_gmp::low(n),
         "gmp_barrett" => proth_gmp::barrett(n),
-        _ => panic!("You must select a valid method: gmp_simple, gmp, gmp2, gmp_barrett")
+        _ => panic!("You must select a valid method: gmp_simple, gmp_medium, gmp_low, gmp_barrett")
     };
     println!("exit");
 }
 
-// tests
-
-#[cfg(test)]
-mod tests {
-    use crate::{Proth, proth_gmp, proth_gmp_simple};
-    
-    #[test]
-    fn smoke() {
-        assert_eq!(2 + 2, 4);
-    }
-    #[test]
-    fn test_proth_gmp() {
-        let five = Proth { t: 1, e: 2 };
-        assert_eq!((proth_gmp(five)).1, -1);
-    }
-    #[test]
-    fn test_proth_gmp_2() {
-        let five_26607 = Proth { t: 5, e: 26607 };
-        assert_eq!((proth_gmp(five_26607)).1, -1);
-    }
-    #[test]
-    fn test_proth_gmp_3() {
-        let five_26606 = Proth { t: 5, e: 26606 };
-        let r = proth_gmp(five_26606);
-        let r_simple = proth_gmp_simple(five_26606);
-        assert_ne!(r.1, -1);
-        assert_eq!(r.0, r_simple.0);
-        assert_eq!(r.1, r_simple.1);
-    }
-}
