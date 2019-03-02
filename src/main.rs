@@ -1,57 +1,11 @@
 mod proth_gmp;
 use proth_gmp::{Proth};
 
+extern crate nom;
+mod parser;
+
 extern crate clap; 
 use clap::{Arg, App};
-
-#[macro_use]
-extern crate nom;
-use nom::digit;
-use nom::types::CompleteStr;
-use std::str::FromStr;
-use std::num::ParseIntError;
-
-fn u32_from_cstr(input: CompleteStr) -> Result<u32, ParseIntError> {
-    u32::from_str(input.as_ref())
-}
-
-named!(uint32<CompleteStr, u32>,
-    map_res!(digit, u32_from_cstr)
-);
-
-named!(times<CompleteStr, CompleteStr>,
-    alt!(tag!("*") | tag!("x") | tag!("."))
-);
-
-named!(two<CompleteStr, CompleteStr>,
-    tag!("2")
-);
-
-named!(to_the<CompleteStr, CompleteStr>,
-    alt!( tag!("^") | tag!("e") )
-);
-
-named!(plus<CompleteStr, CompleteStr>,
-    tag!("+")
-);
-
-named!(one<CompleteStr, CompleteStr>,
-    tag!("1")
-);
-
-
-named!(parse_proth<CompleteStr, Proth>,
-    do_parse!(
-        t: uint32 >>
-        times >>
-        two >>
-        to_the >>
-        e: uint32 >>
-        plus >>
-        one >>
-        (Proth { t, e })
-    )
-);
 
 fn main() {
     let matches = App::new("Hazel's Primality Tester")
@@ -74,16 +28,13 @@ fn main() {
         .get_matches();
     assert!(matches.is_present("number"));
     let number_s : &str = matches.value_of("number").expect("What");
-    let number_cs = CompleteStr(number_s);
-    let number_parsed = parse_proth(number_cs);
-    println!("{:?}", number_parsed);
-    let n : Proth =  number_parsed.expect("You must provide numbers in the format 943*2^3442990+1").1;
+    let n : Proth =  parser::proth(number_s);
     println!("{:?}", n);
     let method : &str = matches.value_of("method").expect("What");
     match method {
         "gmp_simple" => proth_gmp::simple(n),
-        "gmp" => proth_gmp::medium(n),
-        "gmp2" => proth_gmp::low(n),
+        "gmp_medium" => proth_gmp::medium(n),
+        "gmp_low" => proth_gmp::low(n),
         "gmp_barrett" => proth_gmp::barrett(n),
         _ => panic!("You must select a valid method: gmp_simple, gmp, gmp2, gmp_barrett")
     };
