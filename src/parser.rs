@@ -1,8 +1,8 @@
+use crate::proth::Proth;
 use nom::{*};
 use nom::types::CompleteStr;
 use std::str::FromStr;
 use std::num::ParseIntError;
-use crate::proth_gmp::{Proth};
 
 
 fn u32_from_cstr(input: CompleteStr) -> Result<u32, ParseIntError> {

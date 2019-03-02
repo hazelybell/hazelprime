@@ -1,5 +1,6 @@
+mod proth;
+use proth::{Proth};
 mod proth_gmp;
-use proth_gmp::{Proth};
 
 extern crate nom;
 mod parser;

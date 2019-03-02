@@ -1,14 +1,10 @@
+use crate::proth::Proth;
 use rug::Integer;
 use rug::Assign;
 use gmp_mpfr_sys::gmp;
 use gmp_mpfr_sys::gmp::{limb_t, size_t};
 use std::mem::size_of;
 
-#[derive(Debug, Copy, Clone)]
-pub struct Proth {
-    pub t: u32,
-    pub e: u32, 
-}
 
 pub fn simple(n : Proth) -> (Integer, Integer) {
     let two_to_the_e : Integer = Integer::from(Integer::u_pow_u(2, n.e));
