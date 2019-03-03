@@ -2,6 +2,8 @@ mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
+mod big;
+
 extern crate nom;
 mod parser;
 
