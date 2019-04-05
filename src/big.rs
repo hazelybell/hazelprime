@@ -1,3 +1,5 @@
+#![feature(unsized_locals)]
+
 use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -54,10 +56,6 @@ impl IndexMut<BigSize> for Big {
 
 pub fn new_big(sz : BigSize) -> Big {
     assert_ne!(sz, 0);
-//     let mut new_v : Vec<Limb> = Vec::with_capacity(sz as usize);
-//     for _ in 0..sz {
-//         new_v.push(0);
-//     }
     let mut new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
     return Big { v: new_v.into_boxed_slice() };
 }
