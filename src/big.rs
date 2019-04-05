@@ -100,11 +100,18 @@ pub fn ss1_get_k(x_sz : BigSize) -> (BigSize, BigSize, BigSize) {
     }
     assert_ne!(k, 0);
     while true {
-        println!("k: {}", k);
         let twok = 1 << (k as usize);
+        println!("k: {}; 2^k: {}", k, twok);
+        if (twok > N) {
+            panic!("Couldn't satisfy constraints! Giving up.");
+        }
+        
         // find n
         let mut n = 1;
         while (n < 2 * N / twok + k) {
+            n = n << 1;
+        }
+        while (n % twok != 0) {
             n = n << 1;
         }
         println!("2N/2k+k = {};", 2 * N / twok + k);
@@ -124,7 +131,7 @@ pub fn multiply_ss1(p : &mut Big, x : &Big, y : &Big) {
     let y_sz = y.length();
     let p_sz = p.length();
     p.zero();
-    assert_eq!(p_sz, x_sz + y_sz);
+    assert_eq!(p_sz, x_sz);
     assert_eq!(x_sz, y_sz);
 
     let (k, twok, n) = ss1_get_k(x_sz);
@@ -160,22 +167,29 @@ pub fn multiply_ss1(p : &mut Big, x : &Big, y : &Big) {
     assert!(n > 2 * N / twok + k);
     let mut weighted_x = new_big(twok);
     let mut weighted_y = new_big(twok);
-    let mut a = new_big(twok * twok);
-    let mut weighted_c = new_big(twok);
-    let prou : Limb = 1 << two_n_over_2k;
+    let prou : Limb = 1 << two_n_over_2k; // principle (2^k)th root of unity
+    let mut a = new_big(twok * twok); // DFT matrix
+    let mut a_inv = new_big(twok * twok); // Inverse DFT matrix
     {
+        // compute the DFT matrix according to the Fermat Number Transform
         let mut aa = 1;
         for i in 0..twok {
             a[i] = 1;
+            print!("{} ", 1);
             let mut aaa = aa;
             for j in 1..twok {
                 let ij = i + j * twok;
                 a[ij] = aaa;
-                aaa = (aaa * aa) % ((1 << n) + 1); // TODO: replace with shifts and adds;
+                print!("{} ", aaa);
+                aaa = (((aaa as u128) * (aa as u128)) % ((1u128 << n) + 1u128)) as u64; // TODO: replace with shifts and adds;
             }
             aa = (aa * prou) % ((1 << n) + 1); // TODO: replace with shifts and adds;
+            println!("");
         }
     }
+    // compute the inverse DFT matrix
+    // since prou is the 2^k-th root of unity, that means that its multiplicative inverse is prou^(2^k-1)
+    
     // Multiply A and B by the weight vector
     for j in 0..twok {
         {
@@ -197,13 +211,31 @@ pub fn multiply_ss1(p : &mut Big, x : &Big, y : &Big) {
             weighted_y[j] = aer as Limb;
         }
     }
+    // Compute the DFT using Fermat Number Transform
+    let mut dfted_x = new_big(twok);
+    let mut dfted_y = new_big(twok);
     for i in 0..twok {
-        let mut xfi = 0;
-        for j in 0..twok {
-            xfi += (weighted_x[j] * a[i + j * twok])
-                % ((1 << n) + 1); // TODO: replace with shifts and adds
-            
+        {
+            let mut xfi = 0;
+            for j in 0..twok {
+                xfi += (weighted_x[j] * a[i + j * twok])
+                    % ((1 << n) + 1); // TODO: replace with shifts and adds
+            }
+            dfted_x[i] = xfi;
         }
+        {
+            let mut yfi = 0;
+            for j in 0..twok {
+                yfi += (weighted_y[j] * a[i + j * twok])
+                    % ((1 << n) + 1); // TODO: replace with shifts and adds
+            }
+            dfted_y[i] = yfi;
+        }
+    }
+    // Take the dot product P = X · Y
+    let mut dfted_p = new_big(twok);
+    for i in 0..twok {
+        dfted_p[i] = (((dfted_x[i] as u128) * (dfted_y[i] as u128)) % ((1u128 << n) + 1u128)) as u64;
     }
 
 }
@@ -262,7 +294,7 @@ mod tests {
         let mut a = new_big(2);
         assert_eq!(a.length(), 2);
         let mut b = new_big(2);
-        let mut p = new_big(4);
+        let mut p = new_big(2);
         a[0] = 0xFFFFFFFFu64;
         b[0] = 0xFFFFFFFFu64;
         multiply_ss1(&mut p, &a, &b);
@@ -273,14 +305,5 @@ mod tests {
         println!("{:X} {:X}", p[1], p[0]);
         assert_eq!(p[1], 0xFFFFFFFFFFFFFFFE);
         assert_eq!(p[0], 0x0000000000000001);
-        
-        a[1] = 0x00FFFFFFFFFFFFFFu64;
-        a[0] = 0xFFFFFFFFFFFFFFFFu64;
-        b[1] = 0x0u64;
-        b[0] = 0x10u64;        
-        multiply_ss1(&mut p, &a, &b);
-        println!("{:X} {:X}", p[1], p[0]);
-        assert_eq!(p[1], 0x0FFFFFFFFFFFFFFFu64);
-        assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);
     }
 }
