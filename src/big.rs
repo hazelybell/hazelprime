@@ -8,7 +8,7 @@ pub type Limb = u64;
 pub type Limb2 = u128;
 pub const LIMB_SHIFT : usize = 64;
 pub const LIMB_SIZE : BigSize = LIMB_SHIFT as BigSize;
-// pub const LIMB_MASK : Limb2 = 0xFFFFFFFFFFFFFFFFu128;
+pub const LIMB_MASK : Limb2 = 0xFFFFFFFFFFFFFFFFu128;
 
 pub struct Big {
     v: Box<[Limb]>
@@ -18,15 +18,15 @@ impl Big {
     pub fn length(&self) -> BigSize { self.v.len() as BigSize }
     pub fn least_sig(&self) -> Limb { self.v[0] }
     pub fn zero(&mut self) { for i in 0..self.v.len() { self.v[i] = 0 } }
-//     pub fn lt(&self, other: &Big) -> bool {
-//         assert_eq!(self.v.len(), other.v.len());
-//         for i in (0..self.v.len()).rev() {
-//             if (self.v[i] < other.v[i]) {
-//                 return true;
-//             }
-//         }
-//         return false;
-//     }
+    pub fn lt(&self, other: &Big) -> bool {
+        assert_eq!(self.v.len(), other.v.len());
+        for i in (0..self.v.len()).rev() {
+            if (self.v[i] < other.v[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
     pub fn bits(&self) -> BigSize {
         let mut b : BigSize = (self.v.len() as BigSize) * (LIMB_SHIFT as BigSize);
         for i in (0..self.v.len()).rev() {
@@ -86,6 +86,87 @@ impl Big {
         new_v[0] = 1;
         return Big { v: new_v.into_boxed_slice() };
     }
+    pub fn increase(&mut self, a : Limb) {
+        let mut carry : Limb = a;
+        let sz = self.length();
+        for i in 0..sz {
+            let s : Limb2 = (self[i] as Limb2) + (carry as Limb2);
+            self[i] = (s & LIMB_MASK) as Limb;
+            carry = (s >> LIMB_SHIFT) as Limb;
+        }
+        if carry > 0 {
+            panic!("Big overflow in increase()");
+        }
+    }
+    pub fn increase_big(&mut self, a : Big) {
+        let mut carry : Limb = 0;
+        let sz = self.length();
+        for i in 0..sz {
+            let s : Limb2 = 
+                (self[i] as Limb2) 
+                + (carry as Limb2)
+                + (a[i] as Limb2);
+            self[i] = (s & LIMB_MASK) as Limb;
+            carry = (s >> LIMB_SHIFT) as Limb;
+        }
+        if carry > 0 {
+            panic!("Big overflow in increase_big()");
+        }
+    }
+    pub fn decrease_big(&mut self, a : Big) {
+        let mut borrow : Limb = 0;
+        let sz = self.length();
+        for i in 0..sz {
+            let s : Limb;
+            s = self[i].wrapping_sub(borrow);
+            if self[i] >= borrow {
+                borrow = 0;
+            } else {
+                borrow = 1;
+            }
+            let s2 = s.wrapping_sub(a[i]);
+            if s < a[i] {
+                borrow = borrow + 1;
+            }
+            self[i] = s2;
+        }
+        if borrow > 0 {
+            panic!("Big underflow in decrease_big()");
+        }
+    }
+    pub fn slice_bits(&self, start : BigSize, l : BigSize) -> Big {
+        let sz = div_up(l, LIMB_SIZE);
+        let mut r = Big::new(sz);
+        let src_limb_start = start / LIMB_SIZE;
+        let src_bit_start = start % LIMB_SIZE;
+        let src_lower_bits = LIMB_SIZE - src_bit_start;
+        let src_upper_bits = src_bit_start;
+        for i in 0..(l/LIMB_SIZE) {
+            // we need a total of LIMB_SIZE bits for each limb
+            // this is like a shift left
+            // the lower destination limb bits come from 
+            // the upper LIMB_SIZE - start source limb bits
+            let dst_lower = self[src_limb_start + i] >> src_upper_bits;
+            let dst_upper;
+            let over = src_limb_start + i + 1 >= self.length();
+            if src_lower_bits < 64 && !over {
+                dst_upper = self[src_limb_start + i + 1]
+                << src_lower_bits;
+            } else {
+                dst_upper = 0;
+            }
+            r[i] = dst_lower | dst_upper;
+        }
+        let last = sz - 1 + src_limb_start;
+        let over = last >= self.length();
+        let last_r_bits = (start + l) % LIMB_SIZE;
+        if l % LIMB_SIZE > 0 && (!over) && last_r_bits > 0 {
+            let shake = LIMB_SIZE - last_r_bits;
+            let last_r = (self[last] << shake) >> shake;
+            r[sz-1] = last_r;
+        }
+        return r;
+    }
 }
 impl Index<BigSize> for Big {
     type Output = Limb;
@@ -137,6 +218,53 @@ pub fn multiply(a : Big, b : Big) -> Big {
     let b_sz = b.length();
     let mut p = Big::new(a_sz + b_sz);
     multiply_long(&mut p, &a, &b);
+    return p;
+}
+
+pub fn div_up(n : BigSize, d : BigSize) -> BigSize {
+    let mut r = n / d;
+    if r * d < n {
+        r = r + 1;
+    }
+    return r;
+}
+
+pub fn fermat(n : BigSize) -> Big {
+    let sz = div_up(n, LIMB_SIZE);
+    let mut f = Big::new_one(sz);
+    f.shift_left(n);
+    f.increase(1);
+    return f;
+}
+
+pub fn mod_fermat(x : Big, n : BigSize) -> Big {
+    let sz = div_up(n, LIMB_SIZE);
+    let mut plus = Big::new(sz);
+    let mut minus = Big::new(sz);
+    let src_bits = x.bitlen();
+    let iters = div_up(src_bits, n);
+    for i in 0..iters {
+        let piece = x.slice_bits(n*i, n);
+        println!("piece: {}", piece[0]);
+        if i % 2 == 0 { // even
+            plus.increase_big(piece);
+            println!("plus: {}", plus[0])
+        } else { // odd
+            minus.increase_big(piece);
+            println!("minus: {}", minus[0])
+        }
+    }
+    let f = fermat(n);
+    if plus.lt(&minus) {
+        plus.increase_big(f);
+    }
+    plus.decrease_big(minus);
+    return plus;
+}
+
+pub fn mul_mod_fermat(a : Big, b : Big, n : BigSize) -> Big {
+    let p_big = multiply(a, b);
+    let p = mod_fermat(p_big, n);
     return p;
 }
 
@@ -207,5 +335,64 @@ mod tests {
         a[0] = 0x00000000000000FFu64;
         assert_eq!(a[0], 0x00000000000000FFu64);
         assert_eq!(b[0], 0x00000000000000AAu64);
+    }
+    #[test]
+    fn increase_() {
+        let mut a = Big::new(2);
+        a[0] = 0x0FFFFFFFFFFFFFFFu64;
+        a[1] = 0x0000000000000000u64;
+        a.increase(0xF000000000000000u64);
+        assert_eq!(a[0], 0xFFFFFFFFFFFFFFFFu64);
+        assert_eq!(a[1], 0x0000000000000000u64);
+        a.increase(0x0000000000000001u64);
+        assert_eq!(a[0], 0x0000000000000000u64);
+        assert_eq!(a[1], 0x0000000000000001u64);
+    }
+    #[test]
+    fn slice_bits_1() {
+        let mut a = Big::new(3);
+        a[0] = 0x8899AABBCCDDEEFFu64;
+        a[1] = 0x0011223344556677u64;
+        a[2] = 0x0123456789ABCDEFu64;
+        let b = a.slice_bits(64, 64);
+        assert_eq!(b[0], 0x0011223344556677u64);
+        assert_eq!(b.length(), 1);
+        let b = a.slice_bits(64, 128);
+        assert_eq!(b[0], 0x0011223344556677u64);
+        assert_eq!(b[1], 0x0123456789ABCDEFu64);
+        assert_eq!(b.length(), 2);
+        let b = a.slice_bits(32, 64);
+        assert_eq!(b[0], 0x445566778899AABBu64);
+        let b = a.slice_bits(32, 128);
+        assert_eq!(b[0], 0x445566778899AABBu64);
+        assert_eq!(b[1], 0x89ABCDEF00112233u64);
+    }
+    #[test]
+    fn slice_bits_2() {
+        let mut a = Big::new(3);
+        a[0] = 0x8899AABBCCDDEEFFu64;
+        a[1] = 0x0011223344556677u64;
+        a[2] = 0x0123456789ABCDEFu64;
+        let b = a.slice_bits(8, 8);
+        assert_eq!(b[0], 0x00000000000000EEu64);
+        assert_eq!(b.length(), 1);
+    }
+    #[test]
+    fn decrease_big_() {
+        let mut a = Big::new(2);
+        a[0] = 0x0000000000000000u64;
+        a[1] = 0x0000000000000001u64;
+        let b = Big::new_one(2);
+        a.decrease_big(b);
+        assert_eq!(a[0], 0xFFFFFFFFFFFFFFFFu64);
+        assert_eq!(a[1], 0x0000000000000000u64);
+    }
+    #[test]
+    fn mod_fermat_() {
+        let mut a = Big::new(1);
+        a[0] = 656;
+        let r = mod_fermat(a, 3);
+        assert_eq!(r[0], 8);
+        assert_eq!(r.length(), 1);
     }
 }
