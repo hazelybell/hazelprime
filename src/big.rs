@@ -75,6 +75,17 @@ impl Big {
             self[i] = 0;
         }
     }
+    pub fn new(sz : BigSize) -> Big {
+        assert_ne!(sz, 0);
+        let new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
+        return Big { v: new_v.into_boxed_slice() };
+    }
+    pub fn new_one(sz : BigSize) -> Big {
+        assert_ne!(sz, 0);
+        let mut new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
+        new_v[0] = 1;
+        return Big { v: new_v.into_boxed_slice() };
+    }
 }
 impl Index<BigSize> for Big {
     type Output = Limb;
@@ -90,23 +101,12 @@ impl Clone for Big {
     }
 }
 
-pub fn new_big(sz : BigSize) -> Big {
-    assert_ne!(sz, 0);
-    let new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
-    return Big { v: new_v.into_boxed_slice() };
-}
 
-pub fn new_big_one(sz : BigSize) -> Big {
-    assert_ne!(sz, 0);
-    let mut new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
-    new_v[0] = 1;
-    return Big { v: new_v.into_boxed_slice() };
-}
 
 pub fn big_extend(x: Big, sz: BigSize) -> Big {
     let x_sz = x.length();
     assert!(sz >= x_sz);
-    let mut r : Big = new_big(sz);
+    let mut r : Big = Big::new(sz);
     for i in 0..x_sz {
         r[i] = x[i];
     }
@@ -135,7 +135,7 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
 pub fn multiply(a : Big, b : Big) -> Big {
     let a_sz = a.length();
     let b_sz = b.length();
-    let mut p = new_big(a_sz + b_sz);
+    let mut p = Big::new(a_sz + b_sz);
     multiply_long(&mut p, &a, &b);
     return p;
 }
@@ -148,19 +148,19 @@ mod tests {
     use crate::big::{*};
     #[test]
     fn smoke() {
-        let a = new_big(2);
+        let a = Big::new(2);
         assert_eq!(a.length(), 2);
-        let b = new_big(2);
+        let b = Big::new(2);
         let p = multiply(a, b);
         assert_eq!(p.length(), 4);
         assert_eq!(p.least_sig(), 0);
     }
     #[test]
     fn multiply_long_() {
-        let mut a = new_big(2);
+        let mut a = Big::new(2);
         assert_eq!(a.length(), 2);
-        let mut b = new_big(2);
-        let mut p = new_big(4);
+        let mut b = Big::new(2);
+        let mut p = Big::new(4);
         a[0] = 0xFFFFFFFFu64;
         b[0] = 0xFFFFFFFFu64;
         multiply_long(&mut p, &a, &b);
@@ -183,7 +183,7 @@ mod tests {
     }
     #[test]
     fn shift_() {
-        let mut a = new_big(2);
+        let mut a = Big::new(2);
         a[0] = 0x00000000000000FFu64;
         a[1] = 0x0000000000000000u64;
         a.shift_left(8);
@@ -201,7 +201,7 @@ mod tests {
     }
     #[test]
     fn clone_() {
-        let mut a = new_big(1);
+        let mut a = Big::new(1);
         a[0] = 0x00000000000000AAu64;
         let b = a.clone();
         a[0] = 0x00000000000000FFu64;
