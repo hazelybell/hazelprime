@@ -1,8 +1,10 @@
-#![feature(unsized_locals)]
+#![allow(non_snake_case)]
+#![allow(unused)]
 
 use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::cmp::{min, max};
 // use std::boxed::Box;
 
 pub type BigSize = isize;
@@ -56,8 +58,18 @@ impl IndexMut<BigSize> for Big {
 
 pub fn new_big(sz : BigSize) -> Big {
     assert_ne!(sz, 0);
-    let mut new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
+    let new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
     return Big { v: new_v.into_boxed_slice() };
+}
+
+pub fn big_extend(x: Big, sz: BigSize) -> Big {
+    let x_sz = x.length();
+    assert!(sz >= x_sz);
+    let mut r : Big = new_big(sz);
+    for i in 0..x_sz {
+        r[i] = x[i];
+    }
+    return r;
 }
 
 pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
@@ -79,165 +91,126 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
     }
 }
 
-pub fn ss1_get_k(x_sz : BigSize) -> (BigSize, BigSize, BigSize) {
-    let mut k : BigSize = 0;
-    let N : BigSize = x_sz * LIMB_SIZE * 2;
-    println!("N: {}", N);
-    for i in (0..SIZE_SHIFT).rev() {
-        if (x_sz >> i) == 1 {
-            println!("x size = 2^{}", i);
-            k = i as BigSize;
-            for j in 0..i {
-                let x = (1 << j) & x_sz;
-                if x > 0 {
-                    println!("x size: {}", x_sz);
-                    panic!("x size not a power of two!");
+pub fn divides(n : BigSize, d : BigSize) -> bool {
+    return (d % n) == 0;
+}
+
+#[derive(Debug)]
+pub struct Nkn {
+    N: BigSize,
+    k: BigSize,
+    n: BigSize
+}
+
+pub fn ss_simple_get_Nkn(p_bits: BigSize, sz: BigSize) -> Option<Nkn> {
+    // find a suitable N, k and n
+    let N_min = p_bits + 1;
+    let N_max = sz * LIMB_SIZE - 1;
+    let k_max : BigSize = 16;
+    let k_min : BigSize = 1;
+    for N in N_min..(N_max+1) {
+        println!("Trying N={}", N);
+        for k in k_min..(k_max+1) {
+            let twok = 1 << k;
+            if (twok > p_bits) {
+                break;
+            }
+            let n_min = 2 * N / twok + k;
+            let n_max = twok * 4;
+            println!("Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
+            if divides(twok, N) {
+                for n in n_min..(n_max+1) {
+                    println!("Trying n={}", n);
+                    if divides(twok, n) {
+                        println!("Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
+                        let optimal_twok = (N as f64).sqrt();
+                        println!("Optimal twok={}", optimal_twok);
+                        let r = Nkn {
+                            N: N,
+                            k: k,
+                            n: n
+                        };
+                        return Some(r);
+                    }
                 }
             }
-            break;
         }
     }
-    assert_ne!(k, 0);
-    while true {
-        let twok = 1 << (k as usize);
-        println!("k: {}; 2^k: {}", k, twok);
-        if (twok > N) {
-            panic!("Couldn't satisfy constraints! Giving up.");
+    return None;
+}
+
+#[derive(Debug)]
+pub struct NknSize {
+    Nkn: Nkn,
+    sz: BigSize
+}
+
+pub fn ss_simple_get_size(p_bits: BigSize) -> NknSize {
+     /* room for the modulo which is 2^N+1, and bigger than the biggest
+      * value stored in p_bits, so if p_bits is 32, the max valued would
+      * be 2^32-1 and we need to use 2^32+1 for the modulo at a minimum,
+      * however, 2^32+1 takes 33 bits!
+      */
+    let min_bits = p_bits + 1;
+    
+    let mut min_sz : BigSize = min_bits / LIMB_SIZE;
+    if (min_sz * LIMB_SIZE < min_bits) {
+        // we got bit by integer division rounding down
+        min_sz = min_sz + 1;
+    }
+    for sz in min_sz..(min_sz*2) {
+        println!("Trying size {}: {} bits", sz, sz * LIMB_SIZE);
+        let o_Nkn = ss_simple_get_Nkn(p_bits, sz);
+        match o_Nkn {
+            Some(an_Nkn) => {
+                println!("Found size {}: {} bits", sz, sz * LIMB_SIZE);
+                let r = NknSize {
+                    Nkn: an_Nkn,
+                    sz: sz
+                };
+                return r;
+            },
+            None => {
+            }
         }
-        
-        // find n
-        let mut n = 1;
-        while (n < 2 * N / twok + k) {
-            n = n << 1;
-        }
-        while (n % twok != 0) {
-            n = n << 1;
-        }
-        println!("2N/2k+k = {};", 2 * N / twok + k);
-        println!("n = {}", n);
-        if n <= 64-1 {
-            return (k, twok, n);
-        }
-        k = k + 1;
     }
     unreachable!();
 }
 
-pub fn multiply_ss1(p : &mut Big, x : &Big, y : &Big) {
-    assert_ne!(p as *const _, x as *const _);
-    assert_ne!(p as *const _, y as *const _);
-    let x_sz = x.length();
-    let y_sz = y.length();
-    let p_sz = p.length();
-    p.zero();
-    assert_eq!(p_sz, x_sz);
-    assert_eq!(x_sz, y_sz);
+// pub fn ss_big_enough(p_bits: BigSize, sz: BigSize) -> bool {
+//     // Determine if a size sz is big enough to hold a product
+//     // p_bits long without going over the size of the modulo
+//     let max_bits = sz * LIMB_SIZE;
+//     let mod_bits = max_bits - 1; // e.g. 2^63+1 takes 64 bits
+//     if p_bits <= mod_bits {
+//         let o_Nkn = ss_simple_get_Nkn(p_bits, sz);
+//         match o_Nkn {
+//             Some(_an_Nkn) => {
+//                 return true;
+//             },
+//             None => {
+//                 return false;
+//             },
+//         }
+//     } else {
+//         return false; // not possibly big enough
+//     }
+// }
 
-    let (k, twok, n) = ss1_get_k(x_sz);
-    println!("twok: {}", twok);
-    let N : BigSize = p_sz * (LIMB_SHIFT as BigSize);
-    println!("doing multiplication modulo 2^{}+1", N);
-    println!("inner multiplication modulo 2^{}+1", n);
-    
-    println!("n = {}", n);
-    assert_eq!(n % twok, 0); // n is divisible by 2^k
-    let p_bits = LIMB_SIZE * p_sz;
-    let x_bits = LIMB_SIZE * x_sz;
-    println!("p_bits: {} x_bits: {}", p_bits, x_bits);
-    let x_elt_bits = x_bits / twok;
-    let x_elt_per_limb = x_bits / x_elt_bits;
-    println!("x_elt_bits: {} x_elt_per_limb: {}", x_elt_bits, x_elt_per_limb);
-    let x_elt_mask = LIMB_MASK >> (LIMB_SHIFT - (x_elt_bits as usize));
-    println!("x_elt_mask: {:x?}", x_elt_mask);
-
-    let n_over_2k = n / twok;
-    let two_n_over_2k = n_over_2k * 2;
-    println!("n_over_2k: {}, two_n_over_2k: {}", n_over_2k, two_n_over_2k);
-    let x_elts = twok;
-    let y_elts = twok;
-    assert!(n_over_2k > 0);
-    println!("x_elts: {}", x_elts);
-    let bits = x.bits() + y.bits();
-    println!("twok: {} = 2^{}, n = {}, bits = {}, n_over_2k = {}",
-                twok, k, n, bits, n_over_2k);
-    let max_x_shift = n_over_2k * (x_elts - 1);
-    println!("max_x_shift: {}", n_over_2k * (x_elts - 1));
-    println!("two_n_over_2k: {} prou: 2^{}", two_n_over_2k, two_n_over_2k);
-    assert!(n > 2 * N / twok + k);
-    let mut weighted_x = new_big(twok);
-    let mut weighted_y = new_big(twok);
-    let prou : Limb = 1 << two_n_over_2k; // principle (2^k)th root of unity
-    let mut a = new_big(twok * twok); // DFT matrix
-    let mut a_inv = new_big(twok * twok); // Inverse DFT matrix
-    {
-        // compute the DFT matrix according to the Fermat Number Transform
-        let mut aa = 1;
-        for i in 0..twok {
-            a[i] = 1;
-            print!("{} ", 1);
-            let mut aaa = aa;
-            for j in 1..twok {
-                let ij = i + j * twok;
-                a[ij] = aaa;
-                print!("{} ", aaa);
-                aaa = (((aaa as u128) * (aa as u128)) % ((1u128 << n) + 1u128)) as u64; // TODO: replace with shifts and adds;
-            }
-            aa = (aa * prou) % ((1 << n) + 1); // TODO: replace with shifts and adds;
-            println!("");
-        }
-    }
-    // compute the inverse DFT matrix
-    // since prou is the 2^k-th root of unity, that means that its multiplicative inverse is prou^(2^k-1)
-    
-    // Multiply A and B by the weight vector
-    for j in 0..twok {
-        {
-            let xj = j/x_elt_per_limb;
-            let subj = j % x_elt_per_limb;
-            let e = ((x[xj] as u128) >> (x_elt_bits * subj)) & x_elt_mask;
-            let ae = e << j * n_over_2k; // multiply by the weight
-            // reduce mod 2^n+1
-            let aer = ae % ((1 << n) + 1); // TODO: replace with shifts and adds
-            weighted_x[j] = aer as Limb;
-        }
-        {
-            let yj = j/x_elt_per_limb;
-            let subj = j % x_elt_per_limb;
-            let e = ((y[yj] as u128) >> (x_elt_bits * subj)) & x_elt_mask;
-            let ae = e << j * n_over_2k; // multiply by the weight
-            // reduce mod 2^n+1
-            let aer = ae % ((1 << n) + 1); // TODO: replace with shifts and adds
-            weighted_y[j] = aer as Limb;
-        }
-    }
-    // Compute the DFT using Fermat Number Transform
-    let mut dfted_x = new_big(twok);
-    let mut dfted_y = new_big(twok);
-    for i in 0..twok {
-        {
-            let mut xfi = 0;
-            for j in 0..twok {
-                xfi += (weighted_x[j] * a[i + j * twok])
-                    % ((1 << n) + 1); // TODO: replace with shifts and adds
-            }
-            dfted_x[i] = xfi;
-        }
-        {
-            let mut yfi = 0;
-            for j in 0..twok {
-                yfi += (weighted_y[j] * a[i + j * twok])
-                    % ((1 << n) + 1); // TODO: replace with shifts and adds
-            }
-            dfted_y[i] = yfi;
-        }
-    }
-    // Take the dot product P = X · Y
-    let mut dfted_p = new_big(twok);
-    for i in 0..twok {
-        dfted_p[i] = (((dfted_x[i] as u128) * (dfted_y[i] as u128)) % ((1u128 << n) + 1u128)) as u64;
-    }
-
-}
+// pub fn multiply_ss_simple(a: Big, b: Big) -> Big {
+//     let mut target_sz : BigSize = 1;
+//     let a_bits = a.bits();
+//     let b_bits = b.bits();
+//     let p_bits = a_bits + b_bits; // number of bits in the product
+//     while !ss_big_enough(p_bits, target_sz) {
+//         target_sz << 1;
+//     }
+//     // we need space for the product which can be a+b long
+//     let a2 = big_extend(a, target_sz); 
+//     let b2 = big_extend(b, target_sz);
+// //     multiply_ss_simple2(a2, b2, p_bits);
+//     return new_big(1); // shut up the compiler
+// }
 
 pub fn multiply(a : Big, b : Big) -> Big {
     let a_sz = a.length();
@@ -289,20 +262,49 @@ mod tests {
         assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);
     }
     #[test]
-    fn multiply_ss1_() {
-        let mut a = new_big(2);
-        assert_eq!(a.length(), 2);
-        let mut b = new_big(2);
-        let mut p = new_big(2);
-        a[0] = 0xFFFFFFFFu64;
-        b[0] = 0xFFFFFFFFu64;
-        multiply_ss1(&mut p, &a, &b);
-        assert_eq!(p[0], 0xFFFFFFFE00000001);
-        a[0] = 0xFFFFFFFFFFFFFFFFu64;
-        b[0] = 0xFFFFFFFFFFFFFFFFu64;
-        multiply_ss1(&mut p, &a, &b);
-        println!("{:X} {:X}", p[1], p[0]);
-        assert_eq!(p[1], 0xFFFFFFFFFFFFFFFE);
-        assert_eq!(p[0], 0x0000000000000001);
+    fn divides_() {
+        assert!(divides(64, 128));
+        assert!(divides(16, 16));
+    }
+    #[test]
+    fn ss_simple_get_Nkn_1() {
+        let r = ss_simple_get_Nkn(64, 2);
+        assert!(r.is_some())
+    }
+
+    #[test]
+    fn ss_simple_get_Nkn_2() {
+        let r = ss_simple_get_Nkn(32, 1);
+        assert!(r.is_some())
+    }
+    #[test]
+    fn ss_simple_get_Nkn_3() {
+        let r = ss_simple_get_Nkn(64, 1);
+        println!("{:?}", r);
+        assert!(r.is_none())
+    }
+    #[test]
+    fn ss_simple_get_Nkn_4() {
+        let r = ss_simple_get_Nkn(133, 4);
+        println!("{:?}", r);
+        assert!(r.is_some())
+    }
+    #[test]
+    fn ss_simple_get_Nkn_5() {
+        let r = ss_simple_get_Nkn(256, 4);
+        println!("{:?}", r);
+        assert!(r.is_none())
+    }
+    #[test]
+    fn ss_simple_get_Nkn_6() {
+        let r = ss_simple_get_Nkn(1024, 32);
+        println!("{:?}", r);
+        assert!(r.is_some())
+    }
+    #[test]
+    fn ss_simple_get_size_() {
+        let r = ss_simple_get_size(1024);
+        println!("{:?}", r);
+        assert!(false)
     }
 }
