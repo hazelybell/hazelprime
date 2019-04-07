@@ -76,10 +76,6 @@ impl Big {
             self[i] = 0;
         }
     }
-    pub fn shift_left_check(&mut self, n: BigSize) {
-        
-        return self.shift_left(n);
-    }
     pub fn new(sz : BigSize) -> Big {
         assert_ne!(sz, 0);
         let new_v : Vec<Limb> = std::vec::from_elem(0, sz as usize);
