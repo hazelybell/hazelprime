@@ -21,7 +21,7 @@ impl Big {
     pub fn lt(&self, other: &Big) -> bool {
         assert_eq!(self.v.len(), other.v.len());
         for i in (0..self.v.len()).rev() {
-            if (self.v[i] < other.v[i]) {
+            if self.v[i] < other.v[i] {
                 return true;
             }
         }
@@ -161,8 +161,10 @@ impl Big {
         let over = last >= self.length();
         let last_r_bits = (start + l) % LIMB_SIZE;
         if l % LIMB_SIZE > 0 && (!over) && last_r_bits > 0 {
-            let shake = LIMB_SIZE - last_r_bits;
-            let last_r = (self[last] << shake) >> shake;
+            let shake_l = LIMB_SIZE - last_r_bits;
+            let shake_r = LIMB_SIZE - l % LIMB_SIZE;
+            let last_r = (self[last] << shake_l) >> shake_r
+            ;
             r[sz-1] = last_r;
         }
         return r;
@@ -375,6 +377,9 @@ mod tests {
         a[2] = 0x0123456789ABCDEFu64;
         let b = a.slice_bits(8, 8);
         assert_eq!(b[0], 0x00000000000000EEu64);
+        assert_eq!(b.length(), 1);
+        let b = a.slice_bits(8+64, 8);
+        assert_eq!(b[0], 0x0000000000000066u64);
         assert_eq!(b.length(), 1);
     }
     #[test]
