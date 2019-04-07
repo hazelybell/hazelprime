@@ -1,6 +1,7 @@
 use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::fmt;
 
 pub type BigSize = isize;
 // pub const SIZE_SHIFT : usize = 63;
@@ -74,6 +75,10 @@ impl Big {
             // zero the least significant bits
             self[i] = 0;
         }
+    }
+    pub fn shift_left_check(&mut self, n: BigSize) {
+        
+        return self.shift_left(n);
     }
     pub fn new(sz : BigSize) -> Big {
         assert_ne!(sz, 0);
@@ -159,24 +164,52 @@ impl Big {
         }
         let last = sz - 1 + src_limb_start;
         let over = last >= self.length();
-        let last_r_bits = (start + l) % LIMB_SIZE;
+        let last_r_bits = (start + l - 1) % LIMB_SIZE + 1;
+//         println!("last: {} over: {} last_r_bits: {}", last, over, last_r_bits);
         if l % LIMB_SIZE > 0 && (!over) && last_r_bits > 0 {
             let shake_l = LIMB_SIZE - last_r_bits;
             let shake_r = LIMB_SIZE - l % LIMB_SIZE;
-            let last_r = (self[last] << shake_l) >> shake_r
-            ;
+//             println!("shake_l: {} shake_r: {}", shake_l, shake_r);
+            let last_r = (self[last] << shake_l) >> shake_r;
             r[sz-1] = last_r;
         }
         return r;
     }
+    pub fn is_zero(&self) -> bool {
+        let mut r = true;
+        for i in 0..self.v.len() {
+            if self.v[i] != 0 {
+                r = false;
+            }
+        }
+        return r;
+    }
+    pub fn is_one(&self) -> bool {
+        let mut r = true;
+        if self.v[0] != 1 {
+            r = false;
+        }
+        for i in 1..self.v.len() {
+            if self.v[i] != 0 {
+                r = false;
+            }
+        }
+        return r;
+    }
+    pub fn hex_str(&self) -> String {
+        format!("{:X}", self)
+    }
 }
+
 impl Index<BigSize> for Big {
     type Output = Limb;
     fn index(&self, i: BigSize) -> &Limb { &self.v[i as usize] }
 }
+
 impl IndexMut<BigSize> for Big {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
+
 impl Clone for Big {
     fn clone(&self) -> Big {
         let c : Box<[Limb]> = self.v.clone();
@@ -184,7 +217,53 @@ impl Clone for Big {
     }
 }
 
+impl fmt::UpperHex for Big {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut z = true;
+        let mut r = Ok(());
+        for i in (0..self.v.len()).rev() {
+            if z {
+                if self.v[i] == 0 && i > 0 {
+                } else {
+                    z = false;
+                    r = write!(f, "{:X}", self.v[i]);
+                }
+            } else {
+                r = write!(f, "{:016X}", self.v[i]);
+            }
+            match r {
+                Ok(_) => {},
+                Err(_) => {return r;}
+            }
+        }
+        return r;
+    }
+}
 
+impl fmt::Display for Big {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return fmt::UpperHex::fmt(self, f);
+    }
+}
+
+impl fmt::Debug for Big {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut r : fmt::Result;
+        r = write!(f, "Big {:016X}", self.v[self.v.len()-1]);
+        match r {
+            Ok(_) => {},
+            Err(_) => {return r;}
+        }
+        for i in (0..(self.v.len()-1)).rev() {
+            r = write!(f, ",{:016X}", self.v[i]);
+            match r {
+                Ok(_) => {},
+                Err(_) => {return r;}
+            }
+        }
+        return r;
+    }
+}
 
 pub fn big_extend(x: Big, sz: BigSize) -> Big {
     let x_sz = x.length();
@@ -211,11 +290,13 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
             carry = pi >> LIMB_SHIFT;
             p[i+j] = pi as Limb; // we think rust truncates so & LIMB_MASK is unnecessary
         }
-        assert_eq!(carry, 0); // we don't have anywhere left to put the final carry :(
+        // we don't have anywhere left to put the final carry :(
+        assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
+        p[a_sz+b_sz-1] = carry as Limb;
     }
 }
 
-pub fn multiply(a : Big, b : Big) -> Big {
+pub fn multiply(a : &Big, b : &Big) -> Big {
     let a_sz = a.length();
     let b_sz = b.length();
     let mut p = Big::new(a_sz + b_sz);
@@ -239,21 +320,22 @@ pub fn fermat(n : BigSize) -> Big {
     return f;
 }
 
-pub fn mod_fermat(x : Big, n : BigSize) -> Big {
+pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let sz = div_up(n, LIMB_SIZE);
     let mut plus = Big::new(sz);
     let mut minus = Big::new(sz);
     let src_bits = x.bitlen();
     let iters = div_up(src_bits, n);
+//     println!("src_bits: {}, iters: {}", src_bits, iters);
     for i in 0..iters {
         let piece = x.slice_bits(n*i, n);
-        println!("piece: {}", piece[0]);
+//         println!("start: {} len: {} piece: {}", n*i, n, piece);
         if i % 2 == 0 { // even
             plus.increase_big(piece);
-            println!("plus: {}", plus[0])
+//             println!("plus: {}", plus)
         } else { // odd
             minus.increase_big(piece);
-            println!("minus: {}", minus[0])
+//             println!("minus: {}", minus)
         }
     }
     let f = fermat(n);
@@ -264,9 +346,9 @@ pub fn mod_fermat(x : Big, n : BigSize) -> Big {
     return plus;
 }
 
-pub fn mul_mod_fermat(a : Big, b : Big, n : BigSize) -> Big {
+pub fn mul_mod_fermat(a : &Big, b : &Big, n : BigSize) -> Big {
     let p_big = multiply(a, b);
-    let p = mod_fermat(p_big, n);
+    let p = mod_fermat(&p_big, n);
     return p;
 }
 
@@ -281,7 +363,7 @@ mod tests {
         let a = Big::new(2);
         assert_eq!(a.length(), 2);
         let b = Big::new(2);
-        let p = multiply(a, b);
+        let p = multiply(&a, &b);
         assert_eq!(p.length(), 4);
         assert_eq!(p.least_sig(), 0);
     }
@@ -383,6 +465,13 @@ mod tests {
         assert_eq!(b.length(), 1);
     }
     #[test]
+    fn slice_bits_3() {
+        let mut a = Big::new(1);
+        a[0] = 0x100000000;
+        let b = a.slice_bits(32, 32);
+        assert_eq!(b[0], 0x0000000000000001u64);
+    }
+    #[test]
     fn decrease_big_() {
         let mut a = Big::new(2);
         a[0] = 0x0000000000000000u64;
@@ -393,11 +482,83 @@ mod tests {
         assert_eq!(a[1], 0x0000000000000000u64);
     }
     #[test]
-    fn mod_fermat_() {
+    fn mod_fermat_1() {
         let mut a = Big::new(1);
         a[0] = 656;
-        let r = mod_fermat(a, 3);
+        let r = mod_fermat(&a, 3);
         assert_eq!(r[0], 8);
         assert_eq!(r.length(), 1);
+    }
+    #[test]
+    fn mod_fermat_2() {
+        let mut a = fermat(100);
+        assert_eq!(a[0], 1);
+        assert_eq!(a[1], 1<<36);
+        let r = mod_fermat(&a, 100);
+        assert_eq!(r[0], 0);
+        assert_eq!(r[1], 0);
+        a[0] = 2;
+        let r = mod_fermat(&a, 100);
+        assert_eq!(r[0], 1);
+        assert_eq!(r[1], 0);
+        a[0] = 0xFFFFFFFFFFFFFFFFu64;
+        a[1] = 0xFFFFFFFFFFFFFFFFu64;
+        let r = mod_fermat(&a, 100);
+        assert_eq!(r[0], 0xFFFFFFFFF0000000u64);
+        assert_eq!(r[1], 0x0000000FFFFFFFFFu64);
+        let r = mod_fermat(&a, 99);
+        assert_eq!(r[0], 0xFFFFFFFFE0000000u64);
+        assert_eq!(r[1], 0x00000007FFFFFFFFu64);
+    }
+    #[test]
+    fn mul_mod_fermat_1() {
+        let mut a = Big::new(1);
+        a[0] = 41;
+        let mut b = Big::new(1);
+        b[0] = 16;
+        let r = mul_mod_fermat(&a, &b, 3);
+        assert_eq!(r[0], 8);
+        assert_eq!(r.length(), 1);
+        let r = mul_mod_fermat(&a, &b, 16);
+        assert_eq!(r[0], 656);
+        assert_eq!(r.length(), 1);
+    }
+    #[test]
+    fn mul_mod_fermat_2() {
+        let mut a = Big::new(1);
+        a[0] = 0x10000000;
+        let mut b = Big::new(1);
+        b[0] = 0x10;
+        let r = mul_mod_fermat(&a, &b, 32);
+        assert_eq!(r[0], 0x100000000);
+    }
+    #[test]
+    fn mod_fermat_3() {
+        let mut a = Big::new(1);
+        a[0] = 0x100000000;
+        let r = mod_fermat(&a, 32);
+        assert_eq!(r[0], 0x100000000);
+    }
+    #[test]
+    fn is_zero_() {
+        let mut a = Big::new(10);
+        assert!(a.is_zero());
+        a[1] = 1;
+        assert!(!a.is_zero());
+    }
+    #[test]
+    fn hex_str_() {
+        let mut a = Big::new(1);
+        assert_eq!(a.hex_str(), "0");
+        a[0] = 1;
+        assert_eq!(a.hex_str(), "1");
+        let mut a = Big::new(2);
+        assert_eq!(a.hex_str(), "0");
+        a[0] = 1;
+        assert_eq!(a.hex_str(), "1");
+        a[1] = 1;
+        assert_eq!(a.hex_str(), "10000000000000001");
+        assert_eq!(format!("{:X}", a), "10000000000000001");
+        assert_eq!(format!("{}", a), "10000000000000001");
     }
 }
