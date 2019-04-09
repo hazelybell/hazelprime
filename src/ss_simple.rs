@@ -37,8 +37,13 @@ pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
                 break;
             }
             let n_min = 2 * N / twok + k;
-            let n_max = twok * 4;
+            let n_max = N/2;
             println!("Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
+            let piece_sz = N / twok;
+            println!("Piece size: {}", piece_sz);
+            if piece_sz % LIMB_SIZE > 0 {
+                break;
+            }
             let n = div_up(n_min, twok)*twok;
             if n <= n_max {
                 assert!(divides(twok, n));
@@ -140,6 +145,30 @@ pub fn ss_dft_matrix(k: BigSize, n: BigSize) {
     }
 }
 
+pub fn find_mul_inverse_mod_fermat(d: &Big, n: BigSize) -> Big {
+    let nf = fermat(n);
+    let mut x0 = Big::new(nf.length());
+    x0.increase(2);
+    let mut xi = x0.clone();
+    println!("finding inverse of {}  mod {}", d, nf);
+    loop {
+        println!("xi: {}", xi);
+        let dxi = mul_mod_fermat(&d, &xi, n);
+        if dxi.is_one() {
+            return xi;
+        }
+        let mut two = nf.clone();
+        two.increase(2);
+        two.decrease_big(&dxi);
+        let xi_next = mul_mod_fermat(&xi, &two, n);
+        xi = xi_next;
+        if xi.eq(&x0) {
+            panic!("looped!");
+        }
+    }
+    unreachable!();
+}
+
 pub fn ss_idft_matrix(k: BigSize, n: BigSize) {
     let twok : BigSize = 1 << k;
     let piece_sz = div_up(n, LIMB_SIZE);
@@ -159,17 +188,11 @@ pub fn ss_idft_matrix(k: BigSize, n: BigSize) {
     let mut twok_big = Big::new(piece_sz);
     twok_big[0] = twok as Limb;
     println!("twok_big: {}", twok_big);
-    let mut itwok = Big::new_one(piece_sz);
-    for i in 0..twok-1 {
-        itwok = mul_mod_fermat(&prou, &itwok, n);
-//         println!("itwok: {}", itwok);
-        let should_be_one = mul_mod_fermat(&twok_big, &itwok, n);
-        if should_be_one.is_one() {
-            break;
-        }
-    }
+    let mut itwok = find_mul_inverse_mod_fermat(&twok_big, n);
     println!("itwok: {}", itwok);
-    
+    let should_be_one = mul_mod_fermat(&twok_big, &itwok, n);
+    assert!(should_be_one.is_one());
+
     let modf = fermat(n);
     println!("2^n+1: {}", modf);
     let a_elts = twok * twok;
