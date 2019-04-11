@@ -38,8 +38,8 @@ impl IndexMut<BigSize> for SBig {
 
 impl PartialEq for SBig {
     fn eq(&self, other: &SBig) -> bool {
-        if self.v.is_zero() {
-            return other.v.is_zero();
+        if self.v == 0 {
+            return other.v == 0;
         } else {
             return (self.v == other.v) && (self.negative == other.negative);
         }
@@ -48,8 +48,8 @@ impl PartialEq for SBig {
 impl Eq for SBig {}
 impl Ord for SBig {
     fn cmp(&self, other: &SBig) -> Ordering {
-        if self.v.is_zero() {
-            if other.v.is_zero() {
+        if self.v == 0 {
+            if other.v == 0 {
                 return Ordering::Equal;
             } else {
                 if other.negative {
@@ -59,7 +59,7 @@ impl Ord for SBig {
                 }
             }
         } else {
-            if other.v.is_zero() {
+            if other.v == 0 {
                 if self.negative {
                     return Ordering::Less;
                 } else {
