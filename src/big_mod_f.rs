@@ -148,6 +148,7 @@ mod tests {
     }
     #[test]
     fn inv_mod_fermat_1() {
+        // Example from Emily Smith
         let mut a = Big::new(3);
         a[0] = 8;
         let i = inv_mod_fermat(&a, 136);
@@ -156,5 +157,7 @@ mod tests {
         b <<= 133;
         b += 1;
         assert_eq!(i, b);
+        let p = mul_mod_fermat(&a, &i, 136);
+        assert_eq!(p, 1);
     }
 }
