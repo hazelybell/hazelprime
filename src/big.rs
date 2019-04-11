@@ -2,6 +2,8 @@ use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::fmt;
+use std::cmp::Ordering;
+use std::ops::Mul;
 
 pub type BigSize = isize;
 // pub const SIZE_SHIFT : usize = 63;
@@ -19,43 +21,6 @@ impl Big {
     pub fn length(&self) -> BigSize { self.v.len() as BigSize }
     pub fn least_sig(&self) -> Limb { self.v[0] }
     pub fn zero(&mut self) { for i in 0..self.v.len() { self.v[i] = 0 } }
-    pub fn lt(&self, other: &Big) -> bool {
-        assert_eq!(self.v.len(), other.v.len());
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] < other.v[i] {
-                return true;
-            } else if self.v[i] > other.v[i] {
-                return false;
-            }
-        }
-        return false;
-    }
-    pub fn gt(&self, other: &Big) -> bool {
-        assert_eq!(self.v.len(), other.v.len());
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] > other.v[i] {
-                return true;
-            } else if self.v[i] < other.v[i] {
-                return false;
-            }
-        }
-        return false;
-    }
-    pub fn le(&self, other: &Big) -> bool {
-        return !self.gt(other);
-    }
-    pub fn ge(&self, other: &Big) -> bool {
-        return !self.lt(other);
-    }
-    pub fn eq(&self, other: &Big) -> bool {
-        assert_eq!(self.v.len(), other.v.len());
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] != other.v[i] {
-                return false;
-            }
-        }
-        return true;
-    }
     pub fn bits(&self) -> BigSize {
         let mut b : BigSize = (self.v.len() as BigSize) * (LIMB_SHIFT as BigSize);
         for i in (0..self.v.len()).rev() {
@@ -242,6 +207,61 @@ impl Clone for Big {
     }
 }
 
+impl PartialEq for Big {
+    fn eq (&self, other: &Big) -> bool {
+        assert_eq!(self.v.len(), other.v.len());
+        for i in (0..self.v.len()).rev() {
+            if self.v[i] != other.v[i] {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+impl Eq for Big {}
+
+impl Ord for Big {
+    fn cmp(&self, other: &Big) -> Ordering {
+        if self.v.len() > other.v.len() {
+            for i in (0..self.v.len()).rev() {
+                let selfi = self.v[i];
+                let otheri : Limb;
+                if i < other.v.len() {
+                    otheri = other.v[i];
+                } else {
+                    otheri = 0;
+                }
+                if selfi > otheri {
+                    return Ordering::Greater;
+                } else if selfi < otheri {
+                    return Ordering::Less;
+                }
+            }
+        } else {
+            for i in (0..other.v.len()).rev() {
+                let otheri = other.v[i];
+                let selfi : Limb;
+                if i < self.v.len() {
+                    selfi = self.v[i];
+                } else {
+                    selfi = 0;
+                }
+                if selfi > otheri {
+                    return Ordering::Greater;
+                } else if selfi < otheri {
+                    return Ordering::Less;
+                }
+            }
+        }
+        return Ordering::Equal;
+    }
+}
+impl PartialOrd for Big {
+    fn partial_cmp(&self, other: &Big) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl fmt::UpperHex for Big {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut z = true;
@@ -321,12 +341,28 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
     }
 }
 
-pub fn multiply(a : &Big, b : &Big) -> Big {
-    let a_sz = a.length();
-    let b_sz = b.length();
-    let mut p = Big::new(a_sz + b_sz);
-    multiply_long(&mut p, &a, &b);
-    return p;
+impl Mul for Big {
+    type Output = Self;
+    
+    fn mul(self, rhs: Self) -> Self {
+        let self_sz = self.v.len();
+        let rhs_sz = rhs.v.len();
+        let mut p = Big::new((self_sz + rhs_sz) as BigSize);
+        multiply_long(&mut p, &self, &rhs);
+        return p;
+    }
+}
+
+impl Mul for &Big {
+    type Output = Big;
+    
+    fn mul(self, rhs: Self) -> Big {
+        let self_sz = self.v.len();
+        let rhs_sz = rhs.v.len();
+        let mut p = Big::new((self_sz + rhs_sz) as BigSize);
+        multiply_long(&mut p, self, rhs);
+        return p;
+    }
 }
 
 pub fn div_up(n : BigSize, d : BigSize) -> BigSize {
@@ -379,7 +415,7 @@ pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
 }
 
 pub fn mul_mod_fermat(a : &Big, b : &Big, n : BigSize) -> Big {
-    let p_big = multiply(a, b);
+    let p_big = a * b;
     let p = mod_fermat(&p_big, n);
     return p;
 }
@@ -410,36 +446,36 @@ pub fn div(n: &Big, d: &Big) -> Big {
     return q;
 }
 
-pub fn inv_mod_fermat(a: &Big, n: BigSize) -> Big {
-    // extended euclidean algorithm
-    // https://en.wikipedia.org/w/index.php?title=Extended_Euclidean_algorithm&oldid=890036949#Pseudocode
-    let b = fermat(n);
-    let mut s = Big::new(b.length());
-    let s_negative = false;
-    let mut old_s = Big::new_one(b.length());
-    let old_s_negative = false;
-    let mut t = Big::new_one(b.length());
-    let t_negative = false;
-    let mut old_t = Big::new(b.length());
-    let old_t_negative = false;
-    let mut r = b.clone();
-    let mut old_r = a.clone();
-    while !r.is_zero() {
-        let q = div(&old_r, &r);
-        
-        let qr = multipy(&q, &r);
-        assert!(old_r.ge(qr));
-        let mut new_r = old_r.clone();
-        new_r.decrease(&qr);
-        old_r = r;
-        r = new_r;
-        
-        let qs = multiply(&q, &s);
-        if 
-        
-    }
-    unreachable!();
-}
+// pub fn inv_mod_fermat(a: &Big, n: BigSize) -> Big {
+//     // extended euclidean algorithm
+//     // https://en.wikipedia.org/w/index.php?title=Extended_Euclidean_algorithm&oldid=890036949#Pseudocode
+//     let b = fermat(n);
+//     let mut s = Big::new(b.length());
+//     let s_negative = false;
+//     let mut old_s = Big::new_one(b.length());
+//     let old_s_negative = false;
+//     let mut t = Big::new_one(b.length());
+//     let t_negative = false;
+//     let mut old_t = Big::new(b.length());
+//     let old_t_negative = false;
+//     let mut r = b.clone();
+//     let mut old_r = a.clone();
+//     while !r.is_zero() {
+//         let q = div(&old_r, &r);
+//         
+//         let qr = multiply(&q, &r);
+//         assert!(old_r.ge(&qr));
+//         let mut new_r = old_r.clone();
+//         new_r.decrease_big(&qr);
+//         old_r = r;
+//         r = new_r;
+//         
+//         let qs = multiply(&q, &s);
+// //         if 
+//         
+//     }
+//     unreachable!();
+// }
 // **************************************************************************
 // * tests                                                                  *
 // **************************************************************************
@@ -451,7 +487,7 @@ mod tests {
         let a = Big::new(2);
         assert_eq!(a.length(), 2);
         let b = Big::new(2);
-        let p = multiply(&a, &b);
+        let p = a * b;
         assert_eq!(p.length(), 4);
         assert_eq!(p.least_sig(), 0);
     }
@@ -477,6 +513,30 @@ mod tests {
         b[1] = 0x0u64;
         b[0] = 0x10u64;        
         multiply_long(&mut p, &a, &b);
+        println!("{:X} {:X}", p[1], p[0]);
+        assert_eq!(p[1], 0x0FFFFFFFFFFFFFFFu64);
+        assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);
+    }
+    #[test]
+    fn mul_() {
+        let mut a = Big::new(2);
+        assert_eq!(a.length(), 2);
+        let mut b = Big::new(2);
+        a[0] = 0xFFFFFFFFu64;
+        b[0] = 0xFFFFFFFFu64;
+        let p = &a * &b;
+        assert_eq!(p[0], 0xFFFFFFFE00000001);
+        a[0] = 0xFFFFFFFFFFFFFFFFu64;
+        b[0] = 0xFFFFFFFFFFFFFFFFu64;
+        let p = &a * &b;
+        println!("{:X} {:X}", p[1], p[0]);
+        assert_eq!(p[1], 0xFFFFFFFFFFFFFFFE);
+        assert_eq!(p[0], 0x0000000000000001);
+        a[1] = 0x00FFFFFFFFFFFFFFu64;
+        a[0] = 0xFFFFFFFFFFFFFFFFu64;
+        b[1] = 0x0u64;
+        b[0] = 0x10u64;
+        let p = a * b;
         println!("{:X} {:X}", p[1], p[0]);
         assert_eq!(p[1], 0x0FFFFFFFFFFFFFFFu64);
         assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);

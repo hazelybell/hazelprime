@@ -3,6 +3,7 @@ use proth::{Proth};
 mod proth_gmp;
 
 mod big;
+mod sbig;
 mod ss_simple;
 
 extern crate nom;
