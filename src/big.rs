@@ -93,6 +93,16 @@ impl Big {
     pub fn hex_str(&self) -> String {
         format!("{:X}", self)
     }
+    pub fn downsized(&self, sz: BigSize) -> Big {
+        for i in (sz as usize)..self.v.len() {
+            assert_eq!(self.v[i], 0);
+        }
+        let mut n = Big::new(sz);
+        for i in 0..(sz as usize) {
+            n.v[i] = self.v[i];
+        }
+        return n;
+    }
 }
 
 impl Index<BigSize> for Big {
@@ -182,6 +192,18 @@ impl PartialOrd for Big {
         Some(self.cmp(other))
     }
 }
+
+impl PartialOrd<Limb> for Big {
+    fn partial_cmp(&self, other: &Limb) -> Option<Ordering> {
+        for i in 1..self.v.len() {
+            if self.v[i] > 0 {
+                return Some(Ordering::Greater);
+            }
+        }
+        return Some(self.v[0].cmp(other));
+    }
+}
+
 
 impl fmt::UpperHex for Big {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -402,7 +424,7 @@ impl Div for &Big {
         // TODO: fix this to use u64 division instead of binary
         // https://en.wikipedia.org/w/index.php?title=Division_algorithm&oldid=891240037#Integer_division_(unsigned)_with_remainder
         let sz = n.length();
-        if d.ge(&n) {
+        if d >= n {
             return Big::new(sz);
         }
         let bits = n.bits();

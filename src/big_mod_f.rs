@@ -1,4 +1,5 @@
 use crate::big::{*};
+use crate::sbig::{*};
 
 pub fn fermat(n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
@@ -48,36 +49,38 @@ pub fn mul_mod_fermat(a : &Big, b : &Big, n : BigSize) -> Big {
     return p;
 }
 
-// pub fn inv_mod_fermat(a: &Big, n: BigSize) -> Big {
-//     // extended euclidean algorithm
-//     // https://en.wikipedia.org/w/index.php?title=Extended_Euclidean_algorithm&oldid=890036949#Pseudocode
-//     let b = fermat(n);
-//     let mut s = Big::new(b.length());
-//     let s_negative = false;
-//     let mut old_s = Big::new_one(b.length());
-//     let old_s_negative = false;
-//     let mut t = Big::new_one(b.length());
-//     let t_negative = false;
-//     let mut old_t = Big::new(b.length());
-//     let old_t_negative = false;
-//     let mut r = b.clone();
-//     let mut old_r = a.clone();
-//     while !r.is_zero() {
-//         let q = div(&old_r, &r);
-//         
-//         let qr = multiply(&q, &r);
-//         assert!(old_r.ge(&qr));
-//         let mut new_r = old_r.clone();
-//         new_r.decrease_big(&qr);
-//         old_r = r;
-//         r = new_r;
-//         
-//         let qs = multiply(&q, &s);
-// //         if 
-//         
-//     }
-//     unreachable!();
-// }
+pub fn inv_mod_fermat(a: &Big, n: BigSize) -> Big {
+    // extended euclidean algorithm
+    // https://en.wikipedia.org/w/index.php?title=Extended_Euclidean_algorithm&oldid=890036949#Pseudocode
+    let b = fermat(n);
+    assert_eq!(a.length(), b.length());
+    let sz = b.length();
+    let mut t = SBig::new(b.length());
+    let mut new_t = SBig::new_one(b.length());
+    let mut r = b.clone();
+    let mut new_r = a.clone();
+    while new_r != 0 {
+        let q = &r / &new_r;
+        
+        let qt = (&q * &new_t).downsized(sz);
+        let new_new_t = &t - &qt;
+        t = new_t;
+        new_t = new_new_t;
+        
+        let qr = (&q * &new_r).downsized(sz);
+        let mut new_new_r = r.clone();
+        new_new_r -= &qr;
+        r = new_r;
+        new_r = new_new_r;
+    }
+    if r > 1 {
+        panic!("a is not invertible")
+    }
+    if t.is_negative() {
+        t = &t + &b;
+    }
+    return t.into_big();
+}
 
 // **************************************************************************
 // * tests                                                                  *
@@ -142,5 +145,16 @@ mod tests {
         a[0] = 0x100000000;
         let r = mod_fermat(&a, 32);
         assert_eq!(r[0], 0x100000000);
+    }
+    #[test]
+    fn inv_mod_fermat_1() {
+        let mut a = Big::new(3);
+        a[0] = 8;
+        let i = inv_mod_fermat(&a, 136);
+        let mut b = Big::new(3);
+        b[0] = 7;
+        b <<= 133;
+        b += 1;
+        assert_eq!(i, b);
     }
 }
