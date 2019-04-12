@@ -187,7 +187,6 @@ mod tests {
         a[1] = 0xFFFFFFFFFFFFFFFF;
         a[2] = 0x00000000000000FF;
         let mut b = a.clone();
-        b[0] = 16;
         let r = &a * &b;
         println!("a^2: {:?}", &a * &b);
         assert_eq!(r[0], 0xFFFFFFF800000001);

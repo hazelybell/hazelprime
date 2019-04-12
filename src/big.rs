@@ -370,19 +370,29 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
     let p_sz = p.length();
     p.zero();
     assert_eq!(p_sz, a_sz + b_sz);
-    for i in 0..a_sz {
+//     println!("a: {}, b: {}", a, b);
+    for j in 0..b_sz {
         let mut carry : Limb2 = 0;
-        for j in 0..b_sz {
-            let pi : Limb2 = 
-                (p[i+j] as Limb2) 
-                + carry 
-                + ((a[i] as Limb2) * (b[j] as Limb2));
-            carry = pi >> LIMB_SHIFT;
-            p[i+j] = pi as Limb; // we think rust truncates so & LIMB_MASK is unnecessary
+        for i in 0..a_sz {
+//             println!("i: {} j: {}, i+j: {}", i, j, i + j);
+            let new_carry : Limb2 = 0;
+            let mut old = p[i + j] as Limb2;
+//             println!("old: {:X} carry: {:X}", old, carry);
+            old += carry;
+//             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
+            let x = (a[i] as Limb2) * (b[j] as Limb2);
+            let new = old + x;
+//             println!("x: {:X} new: {:X}", x, new);
+            if new < x || new < old {
+                panic!("Wrapped!");
+            }
+            carry = new >> LIMB_SHIFT;
+            p[i + j] = (new & LIMB_MASK) as Limb;
         }
+//         println!("Final carry: {:X}", carry);
         // we don't have anywhere left to put the final carry :(
         assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
-        p[a_sz+b_sz-1] = carry as Limb;
+        p[a_sz+j] = carry as Limb;
     }
 }
 
@@ -510,7 +520,7 @@ mod tests {
         a[0] = 0xFFFFFFFFFFFFFFFFu64;
         b[0] = 0xFFFFFFFFFFFFFFFFu64;
         let p = &a * &b;
-        println!("{:X} {:X}", p[1], p[0]);
+        println!("{:?}x{:?}={:?}", a, b, p);
         assert_eq!(p[1], 0xFFFFFFFFFFFFFFFE);
         assert_eq!(p[0], 0x0000000000000001);
         a[1] = 0x00FFFFFFFFFFFFFFu64;
@@ -521,6 +531,13 @@ mod tests {
         println!("{:X} {:X}", p[1], p[0]);
         assert_eq!(p[1], 0x0FFFFFFFFFFFFFFFu64);
         assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);
+    }
+    #[test]
+    fn mul_2() {
+        let mut a = Big::new(1);
+        a[0] = 0xFFFFFFFC00000001;
+        let p = &a * &a;
+        assert_eq!(p[0], 0xFFFFFFF800000001);
     }
     #[test]
     fn shift_() {

@@ -102,7 +102,7 @@ pub fn ss_split(x: Big, number: BigSize, piece_sz: BigSize) -> Vec<Big> {
     let long_sz = x.length();
     assert!(divides(number, long_sz));
     let limbs_each = long_sz / number;
-    let mut pieces: Vec<Big> = Vec::new();
+    let mut pieces: Vec<Big> = Vec::with_capacity(number);
     for i in 0..number {
         let mut piece = Big::new(piece_sz);
         let start = i * limbs_each;
@@ -226,12 +226,42 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) {
         let shift = js * n / twok;
         println!("shift: {}", shift);
         a_split[j] <<= shift;
-        // split needs to be fixed its producing numbers that are too big
         assert!(a_split[j].lt(&nf));
         b_split[j] <<= shift;
+        assert!(b_split[j].lt(&nf));
     }
-    let A = ss_dft_matrix(k, n);
-    let Ainv = ss_idft_matrix(k, n);
+    // DFT
+    let D = ss_dft_matrix(k, n);
+    for i in 0..twok {
+        {
+            let ai = a_split[i as usize].clone();
+            let mut new_ai = Big::new(piece_sz);
+            for j in 0..twok {
+                new_ai += &mul_mod_fermat(
+                    &ai,
+                    &D[(i + j * twok) as usize],
+                    n
+                );
+            }
+            a_split[i as usize] = mod_fermat(&new_ai, n);
+        }
+        {
+            let bi = b_split[i as usize].clone();
+            let mut new_bi = Big::new(piece_sz);
+            for j in 0..twok {
+                new_bi += &mul_mod_fermat(
+                    &bi, 
+                    &D[(i + j * twok) as usize],
+                    n
+                );
+            }
+            b_split[i as usize] = mod_fermat(&new_bi, n);
+        }
+    }
+    // dot product
+    let mut c_split : Vec<Big> = Vec::with_capacity(pieces);
+    // inverse DFT
+    let Dinv = ss_idft_matrix(k, n);
     
 }
 
@@ -283,7 +313,6 @@ mod tests {
         println!("{:?}", r);
     }
     #[test]
-    #[ignore]
     fn ss_multiply_() {
         let mut a = Big::new(2);
         let mut b = Big::new(2);
@@ -312,13 +341,17 @@ mod tests {
                     let b = &B[bi + bj * dim];
                     let ab = mul_mod_fermat(a, b, n);
                     e += &ab;
-                    println!("e: {:?}", e);
+//                     println!("e: {:?}", e);
                 }
                 e = mod_fermat(&e, n);
-                println!("e final: {}", e);
+                print!("{}", e);
+                if ai == bj { // diagonal
+                    assert_eq!(e, 1);
+                } else {
+                    assert_eq!(e, 0);
+                }
             }
             println!("");
         }
-        assert!(false);
     }
 }
