@@ -115,7 +115,7 @@ pub fn ss_split(x: Big, number: BigSize, piece_sz: BigSize) -> Vec<Big> {
     return pieces;
 }
 
-pub fn ss_dft_matrix(k: BigSize, n: BigSize) {
+pub fn ss_dft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     let twok : BigSize = 1 << k;
     let piece_sz = div_up(n, LIMB_SIZE);
     // DFT/NTT/Fermat Number Transform
@@ -123,6 +123,17 @@ pub fn ss_dft_matrix(k: BigSize, n: BigSize) {
     prou <<= (2 * n / twok); // the twokth primitive root of unity
     let prou = prou;
     println!("prou: {}", prou);
+    
+    let mut prou_powers = Vec::with_capacity(twok as usize);
+    let mut prou_n = Big::new_one(piece_sz);
+    for i in 0..twok {
+        println!("prou^{} = {:?}", i, prou_n);
+        prou_powers.push(prou_n.clone());
+        prou_n = mul_mod_fermat(&prou_n, &prou, n);
+    }
+    println!("prou^{} = {:?}.", twok, prou_n);
+    assert_eq!(prou_n, 1);
+    
     let modf = fermat(n);
     println!("2^n+1: {}", modf);
     let a_elts = twok * twok;
@@ -144,33 +155,10 @@ pub fn ss_dft_matrix(k: BigSize, n: BigSize) {
         aa = mul_mod_fermat(&aa, &prou, n);
         println!("");
     }
+    return a;
 }
 
-pub fn find_mul_inverse_mod_fermat(d: &Big, n: BigSize) -> Big {
-    let nf = fermat(n);
-    let mut x0 = Big::new(nf.length());
-    x0 += 2;
-    let mut xi = x0.clone();
-    println!("finding inverse of {}  mod {}", d, nf);
-    loop {
-        println!("xi: {}", xi);
-        let dxi = mul_mod_fermat(&d, &xi, n);
-        if dxi == 1 {
-            return xi;
-        }
-        let mut two = nf.clone();
-        two += 2;
-        two -= &dxi;
-        let xi_next = mul_mod_fermat(&xi, &two, n);
-        xi = xi_next;
-        if xi.eq(&x0) {
-            panic!("looped!");
-        }
-    }
-    unreachable!();
-}
-
-pub fn ss_idft_matrix(k: BigSize, n: BigSize) {
+pub fn ss_idft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     let twok : BigSize = 1 << k;
     let piece_sz = div_up(n, LIMB_SIZE);
     // DFT/NTT/Fermat Number Transform
@@ -184,12 +172,12 @@ pub fn ss_idft_matrix(k: BigSize, n: BigSize) {
     }
     println!("iprou: {}", iprou);
     let should_be_one = mul_mod_fermat(&prou, &iprou, n);
-    assert!(should_be_one== 1);
+    assert!(should_be_one == 1);
     
     let mut twok_big = Big::new(piece_sz);
     twok_big[0] = twok as Limb;
     println!("twok_big: {}", twok_big);
-    let mut itwok = find_mul_inverse_mod_fermat(&twok_big, n);
+    let mut itwok = inv_mod_fermat(&twok_big, n);
     println!("itwok: {}", itwok);
     let should_be_one = mul_mod_fermat(&twok_big, &itwok, n);
     assert!(should_be_one== 1);
@@ -216,6 +204,7 @@ pub fn ss_idft_matrix(k: BigSize, n: BigSize) {
         aa = mul_mod_fermat(&aa, &iprou, n);
         println!("");
     }
+    return a;
 }
 
 
@@ -294,6 +283,7 @@ mod tests {
         println!("{:?}", r);
     }
     #[test]
+    #[ignore]
     fn ss_multiply_() {
         let mut a = Big::new(2);
         let mut b = Big::new(2);
@@ -302,6 +292,33 @@ mod tests {
         b[1] = 0x0u64;
         b[0] = 0x10u64;
         ss_multiply(a, b);
+        assert!(false);
+    }
+    #[test]
+    fn dft_idft_1() {
+        let n: BigSize = 136;
+        let k: BigSize = 3;
+        let dim = 1 << k;
+        let nf = fermat(n);
+        let sz = nf.length();
+        let A = ss_dft_matrix(k, n);
+        let B = ss_idft_matrix(k, n);
+        for ai in 0..dim {
+            for bj in 0..dim {
+                let mut e = Big::new(sz);
+                for aj in 0..dim {
+                    let bi = aj;
+                    let a = &A[ai + aj * dim];
+                    let b = &B[bi + bj * dim];
+                    let ab = mul_mod_fermat(a, b, n);
+                    e += &ab;
+                    println!("e: {:?}", e);
+                }
+                e = mod_fermat(&e, n);
+                println!("e final: {}", e);
+            }
+            println!("");
+        }
         assert!(false);
     }
 }

@@ -291,10 +291,16 @@ impl AddAssign<&Big> for Big {
         let mut carry : Limb = 0;
         let sz = self.length();
         for i in 0..sz {
+            let ai: Limb;
+            if i < a.length() {
+                ai = a[i];
+            } else {
+                ai = 0;
+            }
             let s : Limb2 = 
                 (self[i] as Limb2) 
                 + (carry as Limb2)
-                + (a[i] as Limb2);
+                + (ai as Limb2);
             self[i] = (s & LIMB_MASK) as Limb;
             carry = (s >> LIMB_SHIFT) as Limb;
         }
@@ -367,7 +373,10 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
     for i in 0..a_sz {
         let mut carry : Limb2 = 0;
         for j in 0..b_sz {
-            let pi : Limb2 = (p[i+j] as Limb2) + carry + ((a[i] as Limb2) * (b[j] as Limb2));
+            let pi : Limb2 = 
+                (p[i+j] as Limb2) 
+                + carry 
+                + ((a[i] as Limb2) * (b[j] as Limb2));
             carry = pi >> LIMB_SHIFT;
             p[i+j] = pi as Limb; // we think rust truncates so & LIMB_MASK is unnecessary
         }

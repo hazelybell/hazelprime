@@ -17,7 +17,17 @@ pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let iters = div_up(src_bits, n);
 //     println!("src_bits: {}, iters: {}", src_bits, iters);
     for i in 0..iters {
-        let piece = x.slice_bits(n*i, n);
+        let chunk: BigSize;
+        if (n*i + n) > src_bits {
+            chunk = src_bits - n*i;
+        } else {
+            chunk = n;
+        }
+        if chunk == 0 {
+            break;
+        }
+//         println!("start: {} len: {}", n*i, chunk);
+        let piece = x.slice_bits(n*i, chunk);
 //         println!("start: {} len: {} piece: {}", n*i, n, piece);
         if i % 2 == 0 { // even
             plus += &piece;
@@ -159,5 +169,36 @@ mod tests {
         assert_eq!(i, b);
         let p = mul_mod_fermat(&a, &i, 136);
         assert_eq!(p, 1);
+    }
+    #[test]
+    fn mod_fermat_4() {
+        let mut a = Big::new(3);
+        a[0] = 0x0000000000000040;
+        a[1] = 0x0000000000000000;
+        a[2] = 0x0000000000003800;
+        let r = mod_fermat(&a, 136);
+        println!("{:?}", r);
+        assert_eq!(r, 8);
+    }
+    #[test]
+    fn mul_mod_fermat_3() {
+        let mut a = Big::new(3);
+        a[0] = 0xFFFFFFFC00000001;
+        a[1] = 0xFFFFFFFFFFFFFFFF;
+        a[2] = 0x00000000000000FF;
+        let mut b = a.clone();
+        b[0] = 16;
+        let r = &a * &b;
+        println!("a^2: {:?}", &a * &b);
+        assert_eq!(r[0], 0xFFFFFFF800000001);
+        assert_eq!(r[1], 0x000000000000000F);
+        assert_eq!(r[2], 0xFFFFF80000000200);
+        assert_eq!(r[3], 0xFFFFFFFFFFFFFFFF);
+        assert_eq!(r[4], 0x000000000000FFFF);
+        let r = mul_mod_fermat(&a, &b, 136);
+        println!("{:?}", r);
+        assert_eq!(r[0], 0x0000000000000000);
+        assert_eq!(r[1], 0x0000000000000010);
+        assert_eq!(r[2], 0x0000000000000000);
     }
 }
