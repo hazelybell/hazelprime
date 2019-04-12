@@ -106,8 +106,9 @@ impl Big {
     }
     pub fn from_hex(src: &str) -> Big {
         let chunk_size = (LIMB_SIZE / 4) as usize;
-        let chunks = src.len() / chunk_size;
-        let remaining = src.len() % chunk_size;
+        let len = src.len();
+        let chunks = len / chunk_size;
+        let remaining = len % chunk_size;
         let sz: BigSize;
         if remaining > 0 {
             sz = (chunks+1) as BigSize;
@@ -116,15 +117,15 @@ impl Big {
         }
         let mut r = Big::new(sz);
         for i in 0..chunks {
-            let start = i * chunk_size;
-            let end = (i+1) * chunk_size;
+            let end = len - i * chunk_size;
+            let start = len - (i+1) * chunk_size;
             let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
                 .unwrap();
             r[i as BigSize] = chunk;
         }
         if remaining > 0 {
-            let start = chunks * chunk_size;
-            let end = src.len();
+            let end = len - chunks * chunk_size;
+            let start = 0;
             let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
                 .unwrap();
             r[chunks as BigSize] = chunk;

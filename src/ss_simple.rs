@@ -275,7 +275,11 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
     for j in 0..pieces {
         let js = j as BigSize;
         let shift = js * n / twok;
-        c_idft[j] >>= shift;
+        let mut coeff = Big::new_one(piece_sz);
+        coeff <<= shift;
+        let invcoeff = inv_mod_fermat(&coeff, n);
+        let unshifted = mul_mod_fermat(&invcoeff, &c_idft[j], n);
+        c_idft[j] = unshifted;
         println!("C{}: {:?}", j, c_idft[j]);
     }
     // do carrying
@@ -347,6 +351,28 @@ mod tests {
         let b = Big::from_hex("10");
         let p = ss_multiply(a, b);
         assert_eq!(p.hex_str(), "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0");
+    }
+    #[test]
+    fn ss_multiply_2() {
+        let a = Big::from_hex("B85497A9BA510638");
+        let b = Big::from_hex("68E100A50B479104");
+        let p = ss_multiply(a, b);
+        assert_eq!(p.hex_str(), "4B84606D1682968773BEAB03EF51D0E0");
+    }
+    #[test]
+    fn ss_multiply_128() {
+        let a = Big::from_hex("5C068A34E30288DED00B063876877E9D");
+        let b = Big::from_hex("C0259E16F63F000194C4D5BBE3BB3907");
+        let p = ss_multiply(a, b);
+        assert_eq!(p.hex_str(), "45126D6DEE4829175D96FEE6FAF7CA84D2CAD2D35BED3265C68E95DD1C946B4B");
+    }
+    #[test]
+    fn ss_multiply_256() {
+        let a = Big::from_hex("B27CC95B7B89BF33DDCE184822C1376CF99527E2862042DBB66313F44C4C47B6");
+        let b = Big::from_hex("5D94E89EF3FBA74A9314E05B5D1533B48AE9F0C710ED2A2C8885CAD9F5757B8F");
+        let p = ss_multiply(a, b);
+        assert_eq!(p.hex_str(), "413F277A8E5F8CA21ECA155F55015643AD0E5FFD1FF5F3F566D0556C650D3C9278081C242052F867408AE0018570DE663FED010592A91E083666CAE3393E80AA");
+        assert!(false);
     }
     #[test]
     fn dft_idft_1() {
