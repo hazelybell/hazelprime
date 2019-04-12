@@ -10,6 +10,8 @@ use std::ops::ShrAssign;
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
+use crate::vast::{*};
+
 pub type BigSize = isize;
 // pub const SIZE_SHIFT : usize = 63;
 pub type Limb = u64;
@@ -131,6 +133,10 @@ impl Big {
             r[chunks as BigSize] = chunk;
         }
         return r;
+    }
+    pub fn as_mut_slice(&mut self) -> &mut[Limb] {
+        let x: &mut[Limb] = &mut self.v[..];
+        return x;
     }
 }
 

@@ -12,9 +12,17 @@ pub fn divides(n : BigSize, d : BigSize) -> bool {
 
 #[derive(Debug)]
 pub struct Nkn {
-    N: BigSize,
-    k: BigSize,
-    n: BigSize
+    pub N: BigSize,
+    pub k: BigSize,
+    pub n: BigSize
+}
+
+pub fn get_next_power_of_two(x: BigSize) -> BigSize {
+    let lz = x.leading_zeros();
+    let fz = 64 - lz; // first zero counting from the right
+    let r = 1 << fz;
+//     println!("x: {} lz: {} fz: {} r: {}", x, lz, fz, r);
+    return r as BigSize;
 }
 
 pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
@@ -23,10 +31,8 @@ pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
     let N_max = N_min * 16; // I have no clue what to set this to :(
     let k_max : BigSize = 16;
     let k_min : BigSize = 1;
-    for N in N_min..(N_max+1) {
-        if (N % (1<<k_min)) != 0 {
-            continue;
-        }
+    let mut N = N_min;
+    while N < N_max {
         println!("Trying N={}", N);
         for k in k_min..(k_max+1) {
             let twok = 1 << k;
@@ -59,6 +65,7 @@ pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
                 return r;
             }
         }
+        N = get_next_power_of_two(N);
     }
     unreachable!();
 }
@@ -115,9 +122,10 @@ pub fn ss_split(x: Big, number: BigSize, piece_sz: BigSize) -> Vec<Big> {
     return pieces;
 }
 
+
 pub fn ss_dft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     let twok : BigSize = 1 << k;
-    let piece_sz = div_up(n, LIMB_SIZE);
+    let piece_sz = div_up(n+1, LIMB_SIZE);
     // DFT/NTT/Fermat Number Transform
     let mut prou = Big::new_one(piece_sz);
     prou <<= (2 * n / twok); // the twokth primitive root of unity
@@ -160,7 +168,7 @@ pub fn ss_dft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
 
 pub fn ss_idft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     let twok : BigSize = 1 << k;
-    let piece_sz = div_up(n, LIMB_SIZE);
+    let piece_sz = div_up(n+1, LIMB_SIZE);
     // DFT/NTT/Fermat Number Transform
     let mut prou = Big::new_one(piece_sz);
     prou <<= (2 * n / twok); // the twokth primitive root of unity
@@ -231,7 +239,7 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
     let k = params.k;
     let n = params.n;
     let twok : BigSize = 1 << k;
-    let piece_sz = div_up(n, LIMB_SIZE);
+    let piece_sz = div_up(n+1, LIMB_SIZE);
     let orig_sz = a.length();
     let mut a_split = ss_split(a, twok, piece_sz);
     let mut b_split = ss_split(b, twok, piece_sz);
@@ -309,7 +317,7 @@ pub fn ss_multiply(a: Big, b: Big) -> Big {
     let b2 = big_extend(b, sz);
     let p = ss_multiply2(a2, b2, params.Nkn);
     let p2 = p.downsized(a_sz + b_sz);
-    return p2; // shut up the compiler
+    return p2;
 }
 
 
@@ -334,6 +342,7 @@ mod tests {
     fn ss_simple_get_size_2() {
         let r = ss_simple_get_size(120);
         println!("{:?}", r);
+        assert!(false);
     }
     #[test]
     fn div_up_() {
@@ -372,6 +381,13 @@ mod tests {
         let b = Big::from_hex("5D94E89EF3FBA74A9314E05B5D1533B48AE9F0C710ED2A2C8885CAD9F5757B8F");
         let p = ss_multiply(a, b);
         assert_eq!(p.hex_str(), "413F277A8E5F8CA21ECA155F55015643AD0E5FFD1FF5F3F566D0556C650D3C9278081C242052F867408AE0018570DE663FED010592A91E083666CAE3393E80AA");
+    }
+    #[test]
+    fn ss_multiply_512() {
+        let a = Big::from_hex("F99527E2862042DBB66313F44C4C47B6C0259E16F63F000194C4D5BBE3BB39075C068A34E30288DED00B063876877E9D68E100A50B479104B85497A9BA510638");
+        let b = Big::from_hex("D517B4B082CB3651E1CEE7FF12C1F985D94E89EF3FBA74A9314E05B5D1533B48AE9F0C710ED2A2C8885CAD9F5757B8FB27CC95B7B89BF33DDCE184822C1376C");
+        let p = ss_multiply(a, b);
+        assert_eq!(p.hex_str(), "CFC036BF050D730EA92C3A8E66BF44B94319958CC3C0E8FD8570CC61A7CD39CD66EFBE891948DD59F4AF2FCFC7CB63B8682B9660B3AC2142DF54E37DA1A4EDF3D0962A14463B0E5CDE726E2FD903B8FFA53AC9E2ECCCDB93B0D4078912B98887A54AA1782704F6E7AF894DA712689FDFCCDFCF33B91DB702A68AC4B22BCA7A0");
         assert!(false);
     }
     #[test]
@@ -404,5 +420,10 @@ mod tests {
             }
             println!("");
         }
+    }
+    #[test]
+    fn get_next_power_of_two_() {
+        let r = get_next_power_of_two(1022);
+        assert_eq!(r, 1024);
     }
 }

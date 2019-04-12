@@ -2,10 +2,12 @@ mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
+mod vast;
 mod big;
 mod sbig;
 mod big_mod_f;
 mod ss_simple;
+mod ss_recursive;
 
 extern crate nom;
 mod parser;

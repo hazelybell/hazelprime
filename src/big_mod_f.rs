@@ -10,7 +10,7 @@ pub fn fermat(n : BigSize) -> Big {
 }
 
 pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
-    let sz = div_up(n, LIMB_SIZE);
+    let sz = div_up(n+1, LIMB_SIZE);
     let mut plus = Big::new(sz);
     let mut minus = Big::new(sz);
     let src_bits = x.bitlen();
