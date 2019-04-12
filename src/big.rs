@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 use std::ops::Mul;
 use std::ops::Div;
 use std::ops::ShlAssign;
+use std::ops::ShrAssign;
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
@@ -102,6 +103,33 @@ impl Big {
             n.v[i] = self.v[i];
         }
         return n;
+    }
+    pub fn from_hex(src: &str) -> Big {
+        let chunk_size = (LIMB_SIZE / 4) as usize;
+        let chunks = src.len() / chunk_size;
+        let remaining = src.len() % chunk_size;
+        let sz: BigSize;
+        if remaining > 0 {
+            sz = (chunks+1) as BigSize;
+        } else {
+            sz = chunks as BigSize;
+        }
+        let mut r = Big::new(sz);
+        for i in 0..chunks {
+            let start = i * chunk_size;
+            let end = (i+1) * chunk_size;
+            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
+                .unwrap();
+            r[i as BigSize] = chunk;
+        }
+        if remaining > 0 {
+            let start = chunks * chunk_size;
+            let end = src.len();
+            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
+                .unwrap();
+            r[chunks as BigSize] = chunk;
+        }
+        return r;
     }
 }
 
@@ -282,6 +310,32 @@ impl ShlAssign<BigSize> for Big {
         for i in 0..n_limbs {
             // zero the least significant bits
             self[i] = 0;
+        }
+    }
+}
+
+impl ShrAssign<BigSize> for Big {
+    fn shr_assign(&mut self, n: BigSize) {
+        // rely on integer rounding down here
+        let n_limbs = n / LIMB_SIZE;
+        let n_bits = n - (n_limbs * LIMB_SIZE);
+        let sz = self.length();
+        let limbs_remaining = sz - n_limbs;
+        assert!(n_limbs < sz);
+        for i in 0..limbs_remaining {
+            let src_lower = i + n_limbs;
+            let src_upper = i + n_limbs + 1;
+            let lower = self[src_lower] >> n_bits;
+            let upper : Limb;
+            if src_upper >= sz || n_bits == 0 {
+                upper = 0;
+            } else {
+                upper = self[src_upper] << (LIMB_SIZE - n_bits);
+            }
+            self[i] = upper | lower;
+        }
+        for i in limbs_remaining..sz {
+            self[i] = 0; // zero the most significant bits
         }
     }
 }
@@ -539,7 +593,7 @@ mod tests {
         assert_eq!(p[0], 0xFFFFFFF800000001);
     }
     #[test]
-    fn shift_() {
+    fn shift_right() {
         let mut a = Big::new(2);
         a[0] = 0x00000000000000FFu64;
         a[1] = 0x0000000000000000u64;
@@ -563,6 +617,32 @@ mod tests {
         a <<= 64;
         assert_eq!(a[0], 0x0000000000000000u64);
         assert_eq!(a[1], 0x00000000000000FFu64);
+    }
+    #[test]
+    fn shift_left() {
+        let mut a = Big::new(2);
+        a[0] = 0x0000000000000000u64;
+        a[1] = 0x00000000000000FFu64;
+        a >>= 0;
+        assert_eq!(a[0], 0x0000000000000000u64);
+        assert_eq!(a[1], 0x00000000000000FFu64);
+        a >>= 4;
+        assert_eq!(a[0], 0xF000000000000000u64);
+        assert_eq!(a[1], 0x000000000000000Fu64);
+        a >>= 4;
+        assert_eq!(a[0], 0xFF00000000000000u64);
+        assert_eq!(a[1], 0x0000000000000000u64);
+        a >>= 48;
+        assert_eq!(a[0], 0x000000000000FF00u64);
+        assert_eq!(a[1], 0x0000000000000000u64);
+        a >>= 8;
+        assert_eq!(a[0], 0x00000000000000FFu64);
+        assert_eq!(a[1], 0x0000000000000000u64);
+        a[0] = 0x0000000000000000u64;
+        a[1] = 0x00000000000000FFu64;
+        a >>= 64;
+        assert_eq!(a[0], 0x00000000000000FFu64);
+        assert_eq!(a[1], 0x0000000000000000u64);
     }
     #[test]
     fn clone_() {
@@ -664,5 +744,10 @@ mod tests {
         d[0] = 0x00000000D00B0638u64;
         let q = &n / &d;
         assert_eq!(q[0], 0x00000000810E1609u64);
+    }
+    #[test]
+    fn from_hex_() {
+        let a = Big::from_hex("810E1609");
+        assert_eq!(a[0], 0x810E1609);
     }
 }

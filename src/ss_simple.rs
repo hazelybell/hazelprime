@@ -207,16 +207,37 @@ pub fn ss_idft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     return a;
 }
 
+pub fn vec_times_mat(v: Vec<Big>, m: &Vec<Big>, n: BigSize) -> Vec<Big> {
+    let mut r: Vec<Big> = Vec::with_capacity(v.len());
+    let dim = v.len();
+    for i in 0..dim {
+        let mut ri = Big::new(v[i].length());
+        for j in 0..dim {
+            ri += &mul_mod_fermat(
+                &v[j],
+                &m[(i + j * dim)],
+                n
+            );
+        }
+        let ri = mod_fermat(&ri, n);
+        println!("{} {:?}", i, ri);
+        r.push(ri);
+    }
+    return r;
+}
 
-pub fn ss_multiply2(a: Big, b: Big, params: Nkn) {
+pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
     let N = params.N;
     let k = params.k;
     let n = params.n;
     let twok : BigSize = 1 << k;
     let piece_sz = div_up(n, LIMB_SIZE);
+    let orig_sz = a.length();
     let mut a_split = ss_split(a, twok, piece_sz);
     let mut b_split = ss_split(b, twok, piece_sz);
     let pieces = a_split.len();
+    let orig_limbs_each = orig_sz / twok;
+    let sum_sz = orig_limbs_each * twok + (piece_sz - 1);
     let nf = fermat(n);
     println!("pieces: {} limbs_each: {}", pieces, piece_sz);
     // weight
@@ -225,76 +246,66 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) {
         let js = j as BigSize;
         let shift = js * n / twok;
         println!("shift: {}", shift);
+        println!("A{}: {:?}", j, a_split[j]);
         a_split[j] <<= shift;
+        println!("A{}: {:?}", j, a_split[j]);
         assert!(a_split[j].lt(&nf));
         b_split[j] <<= shift;
         assert!(b_split[j].lt(&nf));
     }
     // DFT
     let D = ss_dft_matrix(k, n);
-    for i in 0..twok {
-        {
-            let ai = a_split[i as usize].clone();
-            let mut new_ai = Big::new(piece_sz);
-            for j in 0..twok {
-                new_ai += &mul_mod_fermat(
-                    &ai,
-                    &D[(i + j * twok) as usize],
-                    n
-                );
-            }
-            println!("A{}: {:?}", i, new_ai);
-            a_split[i as usize] = mod_fermat(&new_ai, n);
-        }
-        {
-            let bi = b_split[i as usize].clone();
-            let mut new_bi = Big::new(piece_sz);
-            for j in 0..twok {
-                new_bi += &mul_mod_fermat(
-                    &bi, 
-                    &D[(i + j * twok) as usize],
-                    n
-                );
-            }
-            println!("B{}: {:?}", i, new_bi);
-            b_split[i as usize] = mod_fermat(&new_bi, n);
-        }
-    }
+    
+    println!("A:");
+    let a_dft = vec_times_mat(a_split, &D, n);
+    println!("B:");
+    let b_dft = vec_times_mat(b_split, &D, n);
+    
     // dot product
-    let mut c_split : Vec<Big> = Vec::with_capacity(pieces as usize);
+    let mut c_dft : Vec<Big> = Vec::with_capacity(pieces as usize);
     for i in 0..pieces {
-        let ci = mul_mod_fermat(&a_split[i], &b_split[i], n);
-        c_split.push(ci);
+        let ci = mul_mod_fermat(&a_dft[i], &b_dft[i], n);
+        c_dft.push(ci);
     }
     // inverse DFT
     let Dinv = ss_idft_matrix(k, n);
-    for i in 0..pieces {
-        let ci = c_split[i].clone();
-        let mut new_ci = Big::new(piece_sz);
-        for j in 0..pieces {
-            new_ci += &mul_mod_fermat(
-                &ci,
-                &Dinv[i + j * pieces],
-                n
-            );
-        }
-        println!("C{}: {:?}", i, new_ci);
-        c_split[i] = mod_fermat(&new_ci, n);
+    println!("C:");
+    let mut c_idft = vec_times_mat(c_dft, &Dinv, n);
+    // unshift
+    for j in 0..pieces {
+        let js = j as BigSize;
+        let shift = js * n / twok;
+        c_idft[j] >>= shift;
+        println!("C{}: {:?}", j, c_idft[j]);
     }
+    // do carrying
+    let mut sum: Big = Big::new(sum_sz);
+    for i in (1..pieces).rev() {
+        sum += &c_idft[i];
+        sum <<= LIMB_SIZE * orig_limbs_each;
+    }
+    sum += &c_idft[0];
+    println!("{:?}", sum);
+    let p = mod_fermat(&sum, N);
+    println!("{:?}", p);
+    return p;
 }
 
 pub fn ss_multiply(a: Big, b: Big) -> Big {
     let mut target_sz : BigSize = 1;
     let a_bits = a.bits();
     let b_bits = b.bits();
+    let a_sz = a.length();
+    let b_sz = b.length();
     let p_bits = a_bits + b_bits; // number of bits in the product
     let params = ss_simple_get_size(p_bits);
     let sz = params.sz;
     // we need space for the product which can be a+b long
     let a2 = big_extend(a, sz); 
     let b2 = big_extend(b, sz);
-    ss_multiply2(a2, b2, params.Nkn);
-    return Big::new(1); // shut up the compiler
+    let p = ss_multiply2(a2, b2, params.Nkn);
+    let p2 = p.downsized(a_sz + b_sz);
+    return p2; // shut up the compiler
 }
 
 
@@ -331,15 +342,11 @@ mod tests {
         println!("{:?}", r);
     }
     #[test]
-    fn ss_multiply_() {
-        let mut a = Big::new(2);
-        let mut b = Big::new(2);
-        a[1] = 0x00FFFFFFFFFFFFFFu64;
-        a[0] = 0xFFFFFFFFFFFFFFFFu64;
-        b[1] = 0x0u64;
-        b[0] = 0x10u64;
-        ss_multiply(a, b);
-        assert!(false);
+    fn ss_multiply_1() {
+        let a = Big::from_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        let b = Big::from_hex("10");
+        let p = ss_multiply(a, b);
+        assert_eq!(p.hex_str(), "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0");
     }
     #[test]
     fn dft_idft_1() {
