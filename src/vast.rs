@@ -33,7 +33,7 @@ impl<'a> Vast<'a> {
 
 impl<'a> Deref for VastMut<'a> {
     type Target = Vast<'a>;
-    fn deref(&self) -> &Vast<'a> {
+    fn deref(&self) -> &Vast {
         &Vast {v: self.v}
     }
 }

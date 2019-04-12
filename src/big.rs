@@ -10,7 +10,7 @@ use std::ops::ShrAssign;
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
-// use crate::vast::{*};
+use crate::slice_ops::{*};
 
 pub type BigSize = isize;
 // pub const SIZE_SHIFT : usize = 63;
@@ -465,10 +465,13 @@ impl Mul for Big {
     
     fn mul(self, rhs: Self) -> Self {
         let self_sz = self.v.len();
+        let a = self.as_slice();
         let rhs_sz = rhs.v.len();
-        let mut p = Big::new((self_sz + rhs_sz) as BigSize);
-        multiply_long(&mut p, &self, &rhs);
-        return p;
+        let b = rhs.as_slice();
+        let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
+        let p = pb.as_mut_slice();
+        multiply_slice(p, a, b);
+        return pb;
     }
 }
 

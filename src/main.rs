@@ -2,8 +2,8 @@ mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
-mod vast;
 mod big;
+mod slice_ops;
 mod sbig;
 mod big_mod_f;
 mod ss_simple;
