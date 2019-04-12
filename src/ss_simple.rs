@@ -102,7 +102,7 @@ pub fn ss_split(x: Big, number: BigSize, piece_sz: BigSize) -> Vec<Big> {
     let long_sz = x.length();
     assert!(divides(number, long_sz));
     let limbs_each = long_sz / number;
-    let mut pieces: Vec<Big> = Vec::with_capacity(number);
+    let mut pieces: Vec<Big> = Vec::with_capacity(number as usize);
     for i in 0..number {
         let mut piece = Big::new(piece_sz);
         let start = i * limbs_each;
@@ -243,6 +243,7 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) {
                     n
                 );
             }
+            println!("A{}: {:?}", i, new_ai);
             a_split[i as usize] = mod_fermat(&new_ai, n);
         }
         {
@@ -255,14 +256,31 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) {
                     n
                 );
             }
+            println!("B{}: {:?}", i, new_bi);
             b_split[i as usize] = mod_fermat(&new_bi, n);
         }
     }
     // dot product
-    let mut c_split : Vec<Big> = Vec::with_capacity(pieces);
+    let mut c_split : Vec<Big> = Vec::with_capacity(pieces as usize);
+    for i in 0..pieces {
+        let ci = mul_mod_fermat(&a_split[i], &b_split[i], n);
+        c_split.push(ci);
+    }
     // inverse DFT
     let Dinv = ss_idft_matrix(k, n);
-    
+    for i in 0..pieces {
+        let ci = c_split[i].clone();
+        let mut new_ci = Big::new(piece_sz);
+        for j in 0..pieces {
+            new_ci += &mul_mod_fermat(
+                &ci,
+                &Dinv[i + j * pieces],
+                n
+            );
+        }
+        println!("C{}: {:?}", i, new_ci);
+        c_split[i] = mod_fermat(&new_ci, n);
+    }
 }
 
 pub fn ss_multiply(a: Big, b: Big) -> Big {

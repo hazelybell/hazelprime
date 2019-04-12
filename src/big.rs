@@ -375,7 +375,6 @@ pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
         let mut carry : Limb2 = 0;
         for i in 0..a_sz {
 //             println!("i: {} j: {}, i+j: {}", i, j, i + j);
-            let new_carry : Limb2 = 0;
             let mut old = p[i + j] as Limb2;
 //             println!("old: {:X} carry: {:X}", old, carry);
             old += carry;
