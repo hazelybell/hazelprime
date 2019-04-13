@@ -114,5 +114,8 @@ impl<'a> PartialOrd for SVast<'a> {
 }
 
 // pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
-//     
+//     if (!self.negative) {
+//         negative = false;
+//         add_assign_pod(dest.v, a);
+//     }
 // }

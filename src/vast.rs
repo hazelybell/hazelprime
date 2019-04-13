@@ -220,40 +220,44 @@ impl<'a> PartialEq for VastMut<'a> {
     }
 }
 
-impl<'a> Ord for Vast<'a> {
-    fn cmp(&self, other: &Vast) -> Ordering {
-        if self.v.len() > other.v.len() {
-            for i in (0..self.v.len()).rev() {
-                let selfi = self.v[i];
-                let otheri : Limb;
-                if i < other.v.len() {
-                    otheri = other.v[i];
-                } else {
-                    otheri = 0;
-                }
-                if selfi > otheri {
-                    return Ordering::Greater;
-                } else if selfi < otheri {
-                    return Ordering::Less;
-                }
+pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {
+    if lhs.limbs() > rhs.limbs() {
+        for i in (0..lhs.limbs()).rev() {
+            let lhsi = lhs.get_limb(i);
+            let rhsi : Limb;
+            if i < rhs.limbs() {
+                rhsi = rhs.get_limb(i);
+            } else {
+                rhsi = 0;
             }
-        } else {
-            for i in (0..other.v.len()).rev() {
-                let otheri = other.v[i];
-                let selfi : Limb;
-                if i < self.v.len() {
-                    selfi = self.v[i];
-                } else {
-                    selfi = 0;
-                }
-                if selfi > otheri {
-                    return Ordering::Greater;
-                } else if selfi < otheri {
-                    return Ordering::Less;
-                }
+            if lhsi > rhsi {
+                return Ordering::Greater;
+            } else if lhsi < rhsi {
+                return Ordering::Less;
             }
         }
-        return Ordering::Equal;
+    } else {
+        for i in (0..rhs.limbs()).rev() {
+            let rhsi = rhs.get_limb(i);
+            let lhsi : Limb;
+            if i < lhs.limbs() {
+                lhsi = lhs.get_limb(i);
+            } else {
+                lhsi = 0;
+            }
+            if lhsi > rhsi {
+                return Ordering::Greater;
+            } else if lhsi < rhsi {
+                return Ordering::Less;
+            }
+        }
+    }
+    return Ordering::Equal;
+}
+
+impl<'a> Ord for Vast<'a> {
+    fn cmp(&self, other: &Vast) -> Ordering {
+        cmp_pod(self, other)
     }
 }
 impl<'a> PartialOrd for Vast<'a> {
@@ -349,6 +353,35 @@ impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
     }
 }
 
+pub fn backwards_sub_assign_pod(dest: &mut VastMut, a: &Pod) {
+    let mut borrow : Limb = 0;
+    let sz = dest.length();
+    for i in 0..sz {
+        let s : Limb;
+        // these two are flipped!
+        let ai = dest[i];
+        let di = a.get_limb(i);
+        s = di.wrapping_sub(borrow);
+        if di >= borrow {
+            borrow = 0;
+        } else {
+            borrow = 1;
+        }
+        let s2 = s.wrapping_sub(ai);
+        if s < ai {
+            borrow = borrow + 1;
+        }
+        dest[i] = s2;
+    }
+    for i in sz..a.limbs() {
+        if a.get_limb(i) != 0 {
+            panic!("Vast underflow in sub_assign(Vast): other too long")
+        }
+    }
+    if borrow > 0 {
+        panic!("Vast underflow in sub_assign(Vast)");
+    }
+}
 
 // **************************************************************************
 // * tests                                                                  *
