@@ -22,19 +22,7 @@ impl Big {
     pub fn least_sig(&self) -> Limb { self.v[0] }
     pub fn zero(&mut self) { for i in 0..self.v.len() { self.v[i] = 0 } }
     pub fn bits(&self) -> BigSize {
-        let mut b : BigSize = (self.v.len() as BigSize) * (LIMB_SHIFT as BigSize);
-        for i in (0..self.v.len()).rev() {
-            let l = self.v[i];
-            for j in (0..LIMB_SHIFT).rev() {
-                let m = 1u64 << j;
-                if (l & m) == 0 {
-                    b -= 1;
-                } else {
-                    return b;
-                }
-            }
-        }
-        return b;
+        Vast::from(self).bits()
     }
     pub fn bitlen(&self) -> BigSize {
         (self.v.len() as BigSize) * LIMB_SIZE
@@ -162,12 +150,7 @@ impl Eq for Big {}
 
 impl PartialEq<Limb> for &Big {
     fn eq (&self, other: &Limb) -> bool {
-        for i in 1..self.v.len() {
-            if self.v[i] != 0 {
-                return false;
-            }
-        }
-        return self.v[0] == *other;
+        Vast::from(*self) == *other
     }
 }
 
@@ -179,38 +162,7 @@ impl PartialEq<Limb> for Big {
 
 impl Ord for Big {
     fn cmp(&self, other: &Big) -> Ordering {
-        if self.v.len() > other.v.len() {
-            for i in (0..self.v.len()).rev() {
-                let selfi = self.v[i];
-                let otheri : Limb;
-                if i < other.v.len() {
-                    otheri = other.v[i];
-                } else {
-                    otheri = 0;
-                }
-                if selfi > otheri {
-                    return Ordering::Greater;
-                } else if selfi < otheri {
-                    return Ordering::Less;
-                }
-            }
-        } else {
-            for i in (0..other.v.len()).rev() {
-                let otheri = other.v[i];
-                let selfi : Limb;
-                if i < self.v.len() {
-                    selfi = self.v[i];
-                } else {
-                    selfi = 0;
-                }
-                if selfi > otheri {
-                    return Ordering::Greater;
-                } else if selfi < otheri {
-                    return Ordering::Less;
-                }
-            }
-        }
-        return Ordering::Equal;
+        Vast::from(self).cmp(&Vast::from(other))
     }
 }
 impl PartialOrd for Big {

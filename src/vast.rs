@@ -22,7 +22,8 @@ impl<'a> Vast<'a> {
 
 pub trait AvastOps {
     fn min_length(&self) -> BigSize;
-    fn length(& self) -> BigSize;
+    fn length(&self) -> BigSize;
+    fn bits(&self) -> BigSize;
 }
 
 pub trait Avast {
@@ -30,7 +31,7 @@ pub trait Avast {
 }
 
 impl<'a, T> AvastOps for T where T: Avast {
-    fn min_length(& self) -> BigSize {
+    fn min_length(&self) -> BigSize {
         let v = self.as_slice();
         for i in (0..v.len()).rev() {
             if v[i] != 0 {
@@ -39,8 +40,24 @@ impl<'a, T> AvastOps for T where T: Avast {
         }
         return 0;
     }
-    fn length(& self) -> BigSize {
+    fn length(&self) -> BigSize {
         self.as_slice().len() as BigSize
+    }
+    fn bits(&self) -> BigSize {
+        let v = self.as_slice();
+        let mut b : BigSize = (v.len() as BigSize) * (LIMB_SHIFT as BigSize);
+        for i in (0..v.len()).rev() {
+            let l = v[i];
+            for j in (0..LIMB_SHIFT).rev() {
+                let m = 1u64 << j;
+                if (l & m) == 0 {
+                    b -= 1;
+                } else {
+                    return b;
+                }
+            }
+        }
+        return b;
     }
 }
 
@@ -61,8 +78,17 @@ impl<'a> VastMut<'a> {
             self.v[i] = 0;
         }
     }
-    pub fn as_vast(&self) -> Vast {
-        Vast {v: self.v}
+}
+
+impl<'a> From<&'a VastMut<'a>> for Vast<'a> {
+    fn from(m: &'a VastMut<'a>) -> Vast<'a> {
+        Vast {v:  m.v}
+    }
+}
+
+impl<'a> From<VastMut<'a>> for Vast<'a> {
+    fn from(m: VastMut<'a>) -> Vast<'a> {
+        Vast {v:  m.v}
     }
 }
 
@@ -161,7 +187,7 @@ impl<'a> Eq for Vast<'a> {}
 
 impl<'a> PartialEq for VastMut<'a> {
     fn eq (&self, other: &VastMut) -> bool {
-        self.as_vast().eq(&other.as_vast())
+        Vast::from(self).eq(&Vast::from(other))
     }
 }
 
@@ -219,7 +245,7 @@ impl<'a> PartialEq<Limb> for Vast<'a> {
 }
 impl<'a> PartialEq<Limb> for VastMut<'a> {
     fn eq (&self, other: &Limb) -> bool {
-        self.as_vast().eq(other)
+        Vast::from(self).eq(other)
     }
 }
 
@@ -232,7 +258,7 @@ impl<'a> VastMutOps for VastMut<'a> {
         let mut p = self;
         let a_sz = a.min_length();
         let b_sz = b.min_length();
-        let p_sz = p.as_vast().length();
+        let p_sz = Vast::from(&p).length();
         p.zero();
         assert!(p_sz >= a_sz + b_sz);
         for j in 0..b_sz {

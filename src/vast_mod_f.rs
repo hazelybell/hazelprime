@@ -1,10 +1,12 @@
 use crate::limb::{*};
 use crate::vast::{*};
+use crate::svast::{*};
+use crate::chopped::{*};
 
 pub trait Fermat {
     fn fermat(&mut self, n: BigSize);
 //     fn add_fermat(&mut self, n: BigSize);
-//     fn mod_fermat(&mut self, n: BigSize);
+    fn mod_fermat(self, n: BigSize, temp: VastMut);
 }
 
 impl<'a> Fermat for VastMut<'a> {
@@ -33,10 +35,26 @@ impl<'a> Fermat for VastMut<'a> {
 //             }
 //         }
 //     }
-//     
-//     fn mod_fermat(&mut self, n: BigSize) {
-//         
-//     }
+    
+    fn mod_fermat(self, n: BigSize, mut temp: VastMut) {
+        temp.zero();
+        let sz = div_up(n+1, LIMB_SIZE);
+        let f = SVastMut::from(temp);
+        let src_bits = self.bits();
+        let iters = div_up(src_bits, n);
+        for i in 0..iters {
+            let chunk: BigSize;
+            if (n*i + n) > src_bits {
+                chunk = src_bits - n*i;
+            } else {
+                chunk = n;
+            }
+            if chunk == 0 {
+                break;
+            }
+            let piece = Chopped::chop(Vast::from(&self), n*i, chunk);
+        }
+    }
 }
 
 // **************************************************************************

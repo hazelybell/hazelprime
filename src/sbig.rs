@@ -6,11 +6,12 @@ use std::ops::Add;
 use std::ops::Sub;
 
 use crate::limb::{*};
+use crate::svast::{*};
 use crate::big::{*};
 
 pub struct SBig {
-    v: Big,
-    negative: bool
+    pub v: Big,
+    pub negative: bool
 }
 
 impl SBig {
@@ -60,46 +61,13 @@ impl Clone for SBig {
 
 impl PartialEq for SBig {
     fn eq(&self, other: &SBig) -> bool {
-        if self.v == 0 {
-            return other.v == 0;
-        } else {
-            return (self.v == other.v) && (self.negative == other.negative);
-        }
+        SVast::from(self) == SVast::from(other)
     }
 }
 impl Eq for SBig {}
 impl Ord for SBig {
     fn cmp(&self, other: &SBig) -> Ordering {
-        if self.v == 0 {
-            if other.v == 0 {
-                return Ordering::Equal;
-            } else {
-                if other.negative {
-                    return Ordering::Greater;
-                } else {
-                    return Ordering::Less;
-                }
-            }
-        } else {
-            if other.v == 0 {
-                if self.negative {
-                    return Ordering::Less;
-                } else {
-                    return Ordering::Greater;
-                }
-            } else {
-                // neither are zero
-                if self.negative && !other.negative {
-                    return Ordering::Less;
-                } else if (!self.negative) && other.negative {
-                    return Ordering::Greater;
-                } else if (!self.negative) && !other.negative {
-                    return self.v.cmp(&other.v);
-                } else {
-                    return self.v.cmp(&other.v).reverse();
-                }
-            }
-        }
+        SVast::from(self).cmp(&SVast::from(other))
     }
 }
 impl PartialOrd for SBig {

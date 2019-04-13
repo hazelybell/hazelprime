@@ -11,6 +11,7 @@ mod big_mod_f;
 mod vast_mod_f;
 mod ss_simple;
 mod ss_recursive;
+mod chopped;
 
 extern crate nom;
 mod parser;
