@@ -155,13 +155,7 @@ impl Clone for Big {
 
 impl PartialEq for Big {
     fn eq (&self, other: &Big) -> bool {
-        assert_eq!(self.v.len(), other.v.len());
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] != other.v[i] {
-                return false;
-            }
-        }
-        return true;
+        Vast::from(self) == Vast::from(other)
     }
 }
 impl Eq for Big {}
@@ -346,43 +340,17 @@ impl ShrAssign<BigSize> for Big {
 
 impl AddAssign<&Big> for Big {
     fn add_assign(&mut self, a : &Big) {
-        let mut carry : Limb = 0;
-        let sz = self.length();
-        for i in 0..sz {
-            let ai: Limb;
-            if i < a.length() {
-                ai = a[i];
-            } else {
-                ai = 0;
-            }
-            let s : Limb2 = 
-                (self[i] as Limb2) 
-                + (carry as Limb2)
-                + (ai as Limb2);
-            self[i] = (s & LIMB_MASK) as Limb;
-            carry = (s >> LIMB_SHIFT) as Limb;
-        }
-        if carry > 0 {
-            panic!("Big overflow in add_assign(Big)");
-        }
+        let mut sv = VastMut::from(self);
+        let av = Vast::from(a);
+        sv += av;
     }
-    
 }
 
 impl AddAssign<Limb> for Big {
     fn add_assign(&mut self, a: Limb) {
-        let mut carry : Limb = a;
-        let sz = self.length();
-        for i in 0..sz {
-            let s : Limb2 = (self[i] as Limb2) + (carry as Limb2);
-            self[i] = (s & LIMB_MASK) as Limb;
-            carry = (s >> LIMB_SHIFT) as Limb;
-        }
-        if carry > 0 {
-            panic!("Big overflow in increase()");
-        }
+        let mut sv = VastMut::from(self);
+        sv += a;
     }
-    
 }
 
 impl SubAssign<&Big> for Big {
@@ -425,11 +393,11 @@ impl Mul for Big {
     
     fn mul(self, rhs: Self) -> Self {
         let self_sz = self.v.len();
-        let a = Vast::from_big(&self);
+        let a = Vast::from(&self);
         let rhs_sz = rhs.v.len();
-        let b = Vast::from_big(&rhs);
+        let b = Vast::from(&rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = VastMut::from_big(&mut pb);
+        let p = VastMut::from(&mut pb);
         p.assign_mul(a, b);
         return pb;
     }
@@ -440,11 +408,11 @@ impl Mul for &Big {
     
     fn mul(self, rhs: Self) -> Big {
         let self_sz = self.v.len();
-        let a = Vast::from_big(self);
+        let a = Vast::from(self);
         let rhs_sz = rhs.v.len();
-        let b = Vast::from_big(&rhs);
+        let b = Vast::from(rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = VastMut::from_big(&mut pb);
+        let p = VastMut::from(&mut pb);
         p.assign_mul(a, b);
         return pb;
     }
