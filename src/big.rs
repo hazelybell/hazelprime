@@ -12,6 +12,7 @@ use std::ops::SubAssign;
 
 use crate::limb::{*};
 use crate::vast::{*};
+use crate::chopped::{*};
 
 pub struct Big {
     v: Box<[Limb]>
@@ -41,36 +42,9 @@ impl Big {
     pub fn slice_bits(&self, start : BigSize, l : BigSize) -> Big {
         let sz = div_up(l, LIMB_SIZE);
         let mut r = Big::new(sz);
-        let src_limb_start = start / LIMB_SIZE;
-        let src_bit_start = start % LIMB_SIZE;
-        let src_lower_bits = LIMB_SIZE - src_bit_start;
-        let src_upper_bits = src_bit_start;
-        for i in 0..(l/LIMB_SIZE) {
-            // we need a total of LIMB_SIZE bits for each limb
-            // this is like a shift left
-            // the lower destination limb bits come from 
-            // the upper LIMB_SIZE - start source limb bits
-            let dst_lower = self[src_limb_start + i] >> src_upper_bits;
-            let dst_upper;
-            let over = src_limb_start + i + 1 >= self.length();
-            if src_lower_bits < 64 && !over {
-                dst_upper = self[src_limb_start + i + 1]
-                << src_lower_bits;
-            } else {
-                dst_upper = 0;
-            }
-            r[i] = dst_lower | dst_upper;
-        }
-        let last = sz - 1 + src_limb_start;
-        let over = last >= self.length();
-        let last_r_bits = (start + l - 1) % LIMB_SIZE + 1;
-//         println!("last: {} over: {} last_r_bits: {}", last, over, last_r_bits);
-        if l % LIMB_SIZE > 0 && (!over) && last_r_bits > 0 {
-            let shake_l = LIMB_SIZE - last_r_bits;
-            let shake_r = LIMB_SIZE - l % LIMB_SIZE;
-//             println!("shake_l: {} shake_r: {}", shake_l, shake_r);
-            let last_r = (self[last] << shake_l) >> shake_r;
-            r[sz-1] = last_r;
+        let c = Chopped::chop(Vast::from(self), start, l);
+        for i in 0..sz {
+            r[i] = c.index(i);
         }
         return r;
     }
