@@ -39,7 +39,7 @@ impl<'a> Fermat for VastMut<'a> {
     fn mod_fermat(self, n: BigSize, mut temp: VastMut) {
         temp.zero();
         let sz = div_up(n+1, LIMB_SIZE);
-        let f = SVastMut::from(temp);
+        let mut f = SVastMut::from(temp);
         let src_bits = self.bits();
         let iters = div_up(src_bits, n);
         for i in 0..iters {
@@ -53,6 +53,15 @@ impl<'a> Fermat for VastMut<'a> {
                 break;
             }
             let piece = Chopped::chop(Vast::from(&self), n*i, chunk);
+            if i % 2 == 0 {
+                add_assign_svast_pod(&mut f, &piece);
+            } else {
+                sub_assign_svast_pod(&mut f, &piece);
+            }
+            if f.negative {
+                panic!("TODO: implement");
+            }
+            panic!("TODO: implement")
         }
     }
 }

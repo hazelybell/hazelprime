@@ -10,12 +10,12 @@ use crate::sbig::{SBig};
 
 pub struct SVast<'a> {
     v: Vast<'a>,
-    negative: bool
+    pub negative: bool
 }
 
 pub struct SVastMut<'a> {
     v: VastMut<'a>,
-    negative: bool
+    pub negative: bool
 }
 
 impl<'a> From<Vast<'a>> for SVast<'a> {
@@ -125,6 +125,24 @@ pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
             sub_assign_pod(&mut dest.v, a);
         } else {
             negative = false;
+            backwards_sub_assign_pod(&mut dest.v, a);
+        }
+    }
+    dest.negative = negative;
+}
+
+pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
+    let negative: bool;
+    if dest.negative {
+        negative = true;
+        add_assign_pod(&mut dest.v, a);
+    } else { // dest is positive
+        let c = cmp_pod(&mut dest.v, a);
+        if c == Ordering::Greater {
+            negative = false;
+            sub_assign_pod(&mut dest.v, a);
+        } else {
+            negative = true;
             backwards_sub_assign_pod(&mut dest.v, a);
         }
     }
