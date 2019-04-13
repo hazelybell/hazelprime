@@ -4,6 +4,7 @@ mod proth_gmp;
 
 mod big;
 mod slice_ops;
+mod vast;
 mod sbig;
 mod big_mod_f;
 mod ss_simple;

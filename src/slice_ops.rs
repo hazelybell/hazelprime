@@ -44,3 +44,4 @@ pub fn multiply_slice(p: &mut[Limb], a: &[Limb], b: &[Limb]) {
         p[a_sz+j] = carry as Limb;
     }
 }
+

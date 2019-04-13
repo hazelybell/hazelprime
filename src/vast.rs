@@ -21,9 +21,21 @@ impl<'a> Vast<'a> {
     pub fn length(& self) -> BigSize {
         self.v.len() as BigSize
     }
-    pub fn min_length(& self) -> BigSize {
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] != 0 {
+}
+
+trait AvastOps {
+    fn min_length(&self) -> BigSize;
+}
+
+trait Avast {
+    fn as_slice(&self) -> &[Limb];
+}
+
+impl<'a, T> AvastOps for T where T: Avast {
+    fn min_length(& self) -> BigSize {
+        let v = self.as_slice();
+        for i in (0..v.len()).rev() {
+            if v[i] != 0 {
                 return (i + 1) as BigSize;
             }
         }
@@ -31,14 +43,21 @@ impl<'a> Vast<'a> {
     }
 }
 
-impl<'a> Deref for VastMut<'a> {
-    type Target = Vast<'a>;
-    fn deref(&self) -> &Vast {
-        &Vast {v: self.v}
+impl<'a> Avast for Vast<'a> {
+    fn as_slice(&self) -> &[Limb] {
+        self.v
+    }
+}
+impl<'a> Avast for VastMut<'a> {
+    fn as_slice(&self) -> &[Limb] {
+        self.v
     }
 }
 
 impl<'a> VastMut<'a> {
+    pub fn from_big(b: &'a mut Big) -> VastMut<'a> {
+        return VastMut {v: b.as_mut_slice()}
+    }
     pub fn zero(& mut self) {
         for i in 0..self.v.len() {
             self.v[i] = 0;
@@ -49,12 +68,18 @@ impl<'a> VastMut<'a> {
     }
 }
 
+
 impl<'a> Index<BigSize> for Vast<'a> {
     type Output = Limb;
     fn index(&self, i: BigSize) -> &Limb { &self.v[i as usize] }
 }
 
-impl<'a> IndexMut<BigSize> for Vast<'a> {
+impl<'a> Index<BigSize> for VastMut<'a> {
+    type Output = Limb;
+    fn index(&self, i: BigSize) -> &Limb { &self.v[i as usize] }
+}
+
+impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
@@ -98,7 +123,7 @@ mod tests {
     #[test]
     fn create() {
         let mut a = Big::new(2);
-        let mut b: Vast = Vast::from_big(&mut a);
+        let mut b: VastMut = VastMut::from_big(&mut a);
         assert_eq!(b[0], 0);
         assert_eq!(b[1], 0);
         b[0] = 2;
@@ -107,11 +132,11 @@ mod tests {
     #[test]
     fn multiply() {
         let mut ab = Big::new(2);
-        let mut a = Vast::from_big(&mut ab);
+        let mut a = Vast::from_big(&ab);
         let mut bb = Big::new(2);
-        let mut b = Vast::from_big(&mut bb);
+        let mut b = Vast::from_big(&bb);
         let mut pb = Big::new(2);
-        let mut p = Vast::from_big(&mut pb);
+        let mut p = VastMut::from_big(&mut pb);
         multiply_vast(p, a, b);
     }
 }

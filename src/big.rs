@@ -427,39 +427,6 @@ pub fn big_extend(x: Big, sz: BigSize) -> Big {
     return r;
 }
 
-pub fn multiply_long(p : &mut Big, a : &Big, b : &Big) {
-    assert_ne!(p as *const _, a as *const _);
-    assert_ne!(p as *const _, b as *const _);
-    let a_sz = a.length();
-    let b_sz = b.length();
-    let p_sz = p.length();
-    p.zero();
-    assert_eq!(p_sz, a_sz + b_sz);
-//     println!("a: {}, b: {}", a, b);
-    for j in 0..b_sz {
-        let mut carry : Limb2 = 0;
-        for i in 0..a_sz {
-//             println!("i: {} j: {}, i+j: {}", i, j, i + j);
-            let mut old = p[i + j] as Limb2;
-//             println!("old: {:X} carry: {:X}", old, carry);
-            old += carry;
-//             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
-            let x = (a[i] as Limb2) * (b[j] as Limb2);
-            let new = old + x;
-//             println!("x: {:X} new: {:X}", x, new);
-            if new < x || new < old {
-                panic!("Wrapped!");
-            }
-            carry = new >> LIMB_SHIFT;
-            p[i + j] = (new & LIMB_MASK) as Limb;
-        }
-//         println!("Final carry: {:X}", carry);
-        // we don't have anywhere left to put the final carry :(
-        assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
-        p[a_sz+j] = carry as Limb;
-    }
-}
-
 impl Mul for Big {
     type Output = Self;
     
@@ -480,10 +447,13 @@ impl Mul for &Big {
     
     fn mul(self, rhs: Self) -> Big {
         let self_sz = self.v.len();
+        let a = self.as_slice();
         let rhs_sz = rhs.v.len();
-        let mut p = Big::new((self_sz + rhs_sz) as BigSize);
-        multiply_long(&mut p, self, rhs);
-        return p;
+        let b = rhs.as_slice();
+        let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
+        let p = pb.as_mut_slice();
+        multiply_slice(p, a, b);
+        return pb;
     }
 }
 
@@ -494,9 +464,6 @@ pub fn div_up(n : BigSize, d : BigSize) -> BigSize {
     }
     return r;
 }
-
-
-
 
 impl Div for &Big {
     type Output = Big;
@@ -532,8 +499,6 @@ impl Div for &Big {
     }
 }
 
-
-
 // **************************************************************************
 // * tests                                                                  *
 // **************************************************************************
@@ -548,32 +513,6 @@ mod tests {
         let p = a * b;
         assert_eq!(p.length(), 4);
         assert_eq!(p.least_sig(), 0);
-    }
-    #[test]
-    fn multiply_long_() {
-        let mut a = Big::new(2);
-        assert_eq!(a.length(), 2);
-        let mut b = Big::new(2);
-        let mut p = Big::new(4);
-        a[0] = 0xFFFFFFFFu64;
-        b[0] = 0xFFFFFFFFu64;
-        multiply_long(&mut p, &a, &b);
-        assert_eq!(p[0], 0xFFFFFFFE00000001);
-        a[0] = 0xFFFFFFFFFFFFFFFFu64;
-        b[0] = 0xFFFFFFFFFFFFFFFFu64;
-        multiply_long(&mut p, &a, &b);
-        println!("{:X} {:X}", p[1], p[0]);
-        assert_eq!(p[1], 0xFFFFFFFFFFFFFFFE);
-        assert_eq!(p[0], 0x0000000000000001);
-        
-        a[1] = 0x00FFFFFFFFFFFFFFu64;
-        a[0] = 0xFFFFFFFFFFFFFFFFu64;
-        b[1] = 0x0u64;
-        b[0] = 0x10u64;        
-        multiply_long(&mut p, &a, &b);
-        println!("{:X} {:X}", p[1], p[0]);
-        assert_eq!(p[1], 0x0FFFFFFFFFFFFFFFu64);
-        assert_eq!(p[0], 0xFFFFFFFFFFFFFFF0u64);
     }
     #[test]
     fn mul_() {
