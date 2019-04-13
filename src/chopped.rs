@@ -15,7 +15,7 @@ impl<'a> Chopped<'a> {
     }
 }
 
-impl<'a> HasIndexToLimb for Chopped<'a> {
+impl<'a> Pod for Chopped<'a> {
     fn limbs(&self) -> BigSize {
         div_up(self.length, LIMB_SIZE)
     }

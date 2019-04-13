@@ -268,7 +268,7 @@ impl AddAssign<&Big> for Big {
     fn add_assign(&mut self, a : &Big) {
         let mut sv = VastMut::from(self);
         let av = Vast::from(a);
-        sv += &av;
+        sv += av;
     }
 }
 
@@ -282,25 +282,9 @@ impl AddAssign<Limb> for Big {
 impl SubAssign<&Big> for Big {
     fn sub_assign(&mut self, a : &Big) {
 //         println!("{:?}-{:?}", self, a);
-        let mut borrow : Limb = 0;
-        let sz = self.length();
-        for i in 0..sz {
-            let s : Limb;
-            s = self[i].wrapping_sub(borrow);
-            if self[i] >= borrow {
-                borrow = 0;
-            } else {
-                borrow = 1;
-            }
-            let s2 = s.wrapping_sub(a[i]);
-            if s < a[i] {
-                borrow = borrow + 1;
-            }
-            self[i] = s2;
-        }
-        if borrow > 0 {
-            panic!("Big underflow in sub_assign(Big)");
-        }
+        let mut sv = VastMut::from(self);
+        let av = Vast::from(a);
+        sv -= av;
     }
 }
 

@@ -5,6 +5,7 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::ops::AddAssign;
 use std::cmp::Ordering;
+use std::ops::SubAssign;
 
 use crate::limb::{*};
 use crate::big::Big;
@@ -119,12 +120,12 @@ impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
-pub trait HasIndexToLimb {
+pub trait Pod {
     fn limbs(&self) -> BigSize;
     fn get_limb(&self, i: BigSize) -> Limb;
 }
 
-pub impl<'a> HasIndexToLimb for Vast<'a> {
+impl<'a> Pod for Vast<'a> {
     fn limbs(&self) -> BigSize {
         self.length()
     }
@@ -133,7 +134,7 @@ pub impl<'a> HasIndexToLimb for Vast<'a> {
     }
 }
 
-impl<'a> HasIndexToLimb for VastMut<'a> {
+impl<'a> Pod for VastMut<'a> {
     fn limbs(&self) -> BigSize {
         self.length()
     }
@@ -142,43 +143,42 @@ impl<'a> HasIndexToLimb for VastMut<'a> {
     }
 }
 
-impl<'a> AddAssign<&HasIndexToLimb> for VastMut<'a> {
-    fn add_assign(&mut self, a: &HasIndexToLimb) {
-        let mut carry : Limb = 0;
-        let sz = self.length();
-        for i in 0..sz {
-            let ai: Limb;
-            if i < a.limbs() {
-                ai = a.get_limb(i);
-            } else {
-                ai = 0;
-            }
-            let (s1, o1) = Limb::overflowing_add(self[i], carry);
-            let (s2, o2) = Limb::overflowing_add(s1, ai);
-            self[i] = s2;
-            if o1 {
-                carry = 1;
-            } else {
-                carry = 0;
-            }
-            if o2 {
-                carry += 1;
-            }
+pub fn add_assign_pod(dest: &mut VastMut, a: &Pod) {
+    let mut carry : Limb = 0;
+    let sz = dest.length();
+    for i in 0..sz {
+        let ai: Limb;
+        if i < a.limbs() {
+            ai = a.get_limb(i);
+        } else {
+            ai = 0;
         }
-        for i in sz..a.limbs() {
-            if (a.get_limb(i) != 0) {
-                panic!("Vast overflow in add_assign(Vast): other too long!")
-            }
+        let (s1, o1) = Limb::overflowing_add(dest[i], carry);
+        let (s2, o2) = Limb::overflowing_add(s1, ai);
+        dest[i] = s2;
+        if o1 {
+            carry = 1;
+        } else {
+            carry = 0;
         }
-        if carry > 0 {
-            panic!("Vast overflow in add_assign(Vast)!");
+        if o2 {
+            carry += 1;
         }
     }
+    for i in sz..a.limbs() {
+        if (a.get_limb(i) != 0) {
+            panic!("Vast overflow in add_assign(Vast): other too long!")
+        }
+    }
+    if carry > 0 {
+        panic!("Vast overflow in add_assign(Vast)!");
+    }
 }
+
 
 impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
     fn add_assign(&mut self, a: Vast) {
-        self.add_assign(&a);
+        add_assign_pod(self, &a);
     }
 }
 
@@ -315,6 +315,34 @@ impl<'a> VastMutOps for VastMut<'a> {
     }
 }
 
+impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
+    fn sub_assign(&mut self, a: Vast) {
+        let mut borrow : Limb = 0;
+        let sz = self.length();
+        for i in 0..sz {
+            let s : Limb;
+            s = self[i].wrapping_sub(borrow);
+            if self[i] >= borrow {
+                borrow = 0;
+            } else {
+                borrow = 1;
+            }
+            let s2 = s.wrapping_sub(a[i]);
+            if s < a[i] {
+                borrow = borrow + 1;
+            }
+            self[i] = s2;
+        }
+        for i in sz..a.length() {
+            if a[i] != 0 {
+                panic!("Vast underflow in sub_assign(Vast): other too long")
+            }
+        }
+        if borrow > 0 {
+            panic!("Vast underflow in sub_assign(Vast)");
+        }
+    }
+}
 
 
 // **************************************************************************

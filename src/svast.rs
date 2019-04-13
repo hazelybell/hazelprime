@@ -113,3 +113,6 @@ impl<'a> PartialOrd for SVast<'a> {
     }
 }
 
+// pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
+//     
+// }
