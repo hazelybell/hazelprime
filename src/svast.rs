@@ -113,9 +113,20 @@ impl<'a> PartialOrd for SVast<'a> {
     }
 }
 
-// pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
-//     if (!self.negative) {
-//         negative = false;
-//         add_assign_pod(dest.v, a);
-//     }
-// }
+pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
+    let negative: bool;
+    if !dest.negative {
+        negative = false;
+        add_assign_pod(&mut dest.v, a);
+    } else {
+        let c = cmp_pod(&mut dest.v, a);
+        if c == Ordering::Greater {
+            negative = true;
+            sub_assign_pod(&mut dest.v, a);
+        } else {
+            negative = false;
+            backwards_sub_assign_pod(&mut dest.v, a);
+        }
+    }
+    dest.negative = negative;
+}
