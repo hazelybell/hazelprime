@@ -10,7 +10,7 @@ use std::ops::ShrAssign;
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
-use crate::slice_ops::{*};
+use crate::vast::{*};
 
 pub type BigSize = isize;
 // pub const SIZE_SHIFT : usize = 63;
@@ -432,12 +432,12 @@ impl Mul for Big {
     
     fn mul(self, rhs: Self) -> Self {
         let self_sz = self.v.len();
-        let a = self.as_slice();
+        let a = Vast::from_big(&self);
         let rhs_sz = rhs.v.len();
-        let b = rhs.as_slice();
+        let b = Vast::from_big(&rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = pb.as_mut_slice();
-        multiply_slice(p, a, b);
+        let p = VastMut::from_big(&mut pb);
+        p.assign_mul(a, b);
         return pb;
     }
 }
@@ -447,12 +447,12 @@ impl Mul for &Big {
     
     fn mul(self, rhs: Self) -> Big {
         let self_sz = self.v.len();
-        let a = self.as_slice();
+        let a = Vast::from_big(self);
         let rhs_sz = rhs.v.len();
-        let b = rhs.as_slice();
+        let b = Vast::from_big(&rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = pb.as_mut_slice();
-        multiply_slice(p, a, b);
+        let p = VastMut::from_big(&mut pb);
+        p.assign_mul(a, b);
         return pb;
     }
 }

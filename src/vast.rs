@@ -83,33 +83,40 @@ impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
-pub fn multiply_vast(mut p: VastMut, a: Vast, b: Vast) {
-    let a_sz = a.min_length();
-    let b_sz = b.min_length();
-    let p_sz = p.as_vast().length();
-    p.zero();
-    assert!(p_sz >= a_sz + b_sz);
-    for j in 0..b_sz {
-        let mut carry : Limb2 = 0;
-        for i in 0..a_sz {
-//             println!("i: {} j: {}, i+j: {}", i, j, i + j);
-            let mut old = p[i + j] as Limb2;
-//             println!("old: {:X} carry: {:X}", old, carry);
-            old += carry;
-//             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
-            let x = (a[i] as Limb2) * (b[j] as Limb2);
-            let new = old + x;
-//             println!("x: {:X} new: {:X}", x, new);
-            if new < x || new < old {
-                panic!("Wrapped!");
+pub trait VastMutOps {
+    fn assign_mul(self, a: Vast, b: Vast);
+}
+
+impl<'a> VastMutOps for VastMut<'a> {
+    fn assign_mul(self, a: Vast, b: Vast) {
+        let mut p = self;
+        let a_sz = a.min_length();
+        let b_sz = b.min_length();
+        let p_sz = p.as_vast().length();
+        p.zero();
+        assert!(p_sz >= a_sz + b_sz);
+        for j in 0..b_sz {
+            let mut carry : Limb2 = 0;
+            for i in 0..a_sz {
+    //             println!("i: {} j: {}, i+j: {}", i, j, i + j);
+                let mut old = p[i + j] as Limb2;
+    //             println!("old: {:X} carry: {:X}", old, carry);
+                old += carry;
+    //             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
+                let x = (a[i] as Limb2) * (b[j] as Limb2);
+                let new = old + x;
+    //             println!("x: {:X} new: {:X}", x, new);
+                if new < x || new < old {
+                    panic!("Wrapped!");
+                }
+                carry = new >> LIMB_SHIFT;
+                p[i + j] = (new & LIMB_MASK) as Limb;
             }
-            carry = new >> LIMB_SHIFT;
-            p[i + j] = (new & LIMB_MASK) as Limb;
+    //         println!("Final carry: {:X}", carry);
+            // we don't have anywhere left to put the final carry :(
+            assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
+            p[a_sz+j] = carry as Limb;
         }
-//         println!("Final carry: {:X}", carry);
-        // we don't have anywhere left to put the final carry :(
-        assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
-        p[a_sz+j] = carry as Limb;
     }
 }
 
@@ -131,12 +138,13 @@ mod tests {
     }
     #[test]
     fn multiply() {
-        let mut ab = Big::new(2);
+        let mut ab = Big::from_hex("F99527E2862042DBB66313F44C4C47B6C0259E16F63F000194C4D5BBE3BB39075C068A34E30288DED00B063876877E9D68E100A50B479104B85497A9BA510638");
         let mut a = Vast::from_big(&ab);
-        let mut bb = Big::new(2);
+        let mut bb = Big::from_hex("D517B4B082CB3651E1CEE7FF12C1F985D94E89EF3FBA74A9314E05B5D1533B48AE9F0C710ED2A2C8885CAD9F5757B8FB27CC95B7B89BF33DDCE184822C1376C");
         let mut b = Vast::from_big(&bb);
-        let mut pb = Big::new(2);
+        let mut pb = Big::new(16);
         let mut p = VastMut::from_big(&mut pb);
-        multiply_vast(p, a, b);
+        p.assign_mul(a, b);
+        assert_eq!(pb.hex_str(), "CFC036BF050D730EA92C3A8E66BF44B94319958CC3C0E8FD8570CC61A7CD39CD66EFBE891948DD59F4AF2FCFC7CB63B8682B9660B3AC2142DF54E37DA1A4EDF3D0962A14463B0E5CDE726E2FD903B8FFA53AC9E2ECCCDB93B0D4078912B98887A54AA1782704F6E7AF894DA712689FDFCCDFCF33B91DB702A68AC4B22BCA7A0");
     }
 }
