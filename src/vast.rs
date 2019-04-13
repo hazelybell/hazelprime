@@ -4,7 +4,8 @@ use std::ops::Deref;
 use std::ops::Index;
 use std::ops::IndexMut;
 
-use crate::big::{*};
+use crate::limb::{*};
+use crate::big::Big;
 
 pub struct VastMut<'a> {
     v: &'a mut[Limb]
@@ -18,16 +19,14 @@ impl<'a> Vast<'a> {
     pub fn from_big(b: &'a Big) -> Vast<'a> {
         return Vast {v: b.as_slice()}
     }
-    pub fn length(& self) -> BigSize {
-        self.v.len() as BigSize
-    }
 }
 
-trait AvastOps {
+pub trait AvastOps {
     fn min_length(&self) -> BigSize;
+    fn length(& self) -> BigSize;
 }
 
-trait Avast {
+pub trait Avast {
     fn as_slice(&self) -> &[Limb];
 }
 
@@ -40,6 +39,9 @@ impl<'a, T> AvastOps for T where T: Avast {
             }
         }
         return 0;
+    }
+    fn length(& self) -> BigSize {
+        self.as_slice().len() as BigSize
     }
 }
 

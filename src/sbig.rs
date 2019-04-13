@@ -1,5 +1,3 @@
-use crate::big::{*};
-
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::cmp::Ordering;
@@ -7,6 +5,8 @@ use std::ops::Mul;
 use std::ops::Add;
 use std::ops::Sub;
 
+use crate::limb::{*};
+use crate::big::{*};
 
 pub struct SBig {
     v: Big,

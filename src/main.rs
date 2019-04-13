@@ -2,10 +2,12 @@ mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
+mod limb;
 mod big;
 mod vast;
 mod sbig;
 mod big_mod_f;
+mod vast_mod_f;
 mod ss_simple;
 mod ss_recursive;
 

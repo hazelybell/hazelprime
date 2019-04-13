@@ -10,15 +10,8 @@ use std::ops::ShrAssign;
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
+use crate::limb::{*};
 use crate::vast::{*};
-
-pub type BigSize = isize;
-// pub const SIZE_SHIFT : usize = 63;
-pub type Limb = u64;
-pub type Limb2 = u128;
-pub const LIMB_SHIFT : usize = 64;
-pub const LIMB_SIZE : BigSize = LIMB_SHIFT as BigSize;
-pub const LIMB_MASK : Limb2 = 0xFFFFFFFFFFFFFFFFu128;
 
 pub struct Big {
     v: Box<[Limb]>
@@ -455,14 +448,6 @@ impl Mul for &Big {
         p.assign_mul(a, b);
         return pb;
     }
-}
-
-pub fn div_up(n : BigSize, d : BigSize) -> BigSize {
-    let mut r = n / d;
-    if r * d < n {
-        r = r + 1;
-    }
-    return r;
 }
 
 impl Div for &Big {
