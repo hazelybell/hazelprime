@@ -119,14 +119,37 @@ impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
-impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
-    fn add_assign(&mut self, a: Vast) {
+pub trait HasIndexToLimb {
+    fn limbs(&self) -> BigSize;
+    fn get_limb(&self, i: BigSize) -> Limb;
+}
+
+pub impl<'a> HasIndexToLimb for Vast<'a> {
+    fn limbs(&self) -> BigSize {
+        self.length()
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
+        self.v[i as usize]
+    }
+}
+
+impl<'a> HasIndexToLimb for VastMut<'a> {
+    fn limbs(&self) -> BigSize {
+        self.length()
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
+        self.v[i as usize]
+    }
+}
+
+impl<'a> AddAssign<&HasIndexToLimb> for VastMut<'a> {
+    fn add_assign(&mut self, a: &HasIndexToLimb) {
         let mut carry : Limb = 0;
         let sz = self.length();
         for i in 0..sz {
             let ai: Limb;
-            if i < a.length() {
-                ai = a[i];
+            if i < a.limbs() {
+                ai = a.get_limb(i);
             } else {
                 ai = 0;
             }
@@ -142,14 +165,20 @@ impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
                 carry += 1;
             }
         }
-        for i in sz..a.length() {
-            if (a[i] != 0) {
+        for i in sz..a.limbs() {
+            if (a.get_limb(i) != 0) {
                 panic!("Vast overflow in add_assign(Vast): other too long!")
             }
         }
         if carry > 0 {
             panic!("Vast overflow in add_assign(Vast)!");
         }
+    }
+}
+
+impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
+    fn add_assign(&mut self, a: Vast) {
+        self.add_assign(&a);
     }
 }
 

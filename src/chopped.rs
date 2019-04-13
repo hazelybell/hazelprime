@@ -13,7 +13,13 @@ impl<'a> Chopped<'a> {
     pub fn chop(v: Vast<'a>, start: BigSize, length: BigSize) -> Chopped<'a> {
         Chopped {u: v, start: start, length: length}
     }
-    pub fn index(&self, i: BigSize) -> Limb {
+}
+
+impl<'a> HasIndexToLimb for Chopped<'a> {
+    fn limbs(&self) -> BigSize {
+        div_up(self.length, LIMB_SIZE)
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
         /* I would like to use std::ops::Index but it requires we return
          * a reference and I can't create a limb and then return it as a
          * a reference */

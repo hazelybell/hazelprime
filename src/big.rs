@@ -44,7 +44,7 @@ impl Big {
         let mut r = Big::new(sz);
         let c = Chopped::chop(Vast::from(self), start, l);
         for i in 0..sz {
-            r[i] = c.index(i);
+            r[i] = c.get_limb(i);
         }
         return r;
     }
@@ -268,7 +268,7 @@ impl AddAssign<&Big> for Big {
     fn add_assign(&mut self, a : &Big) {
         let mut sv = VastMut::from(self);
         let av = Vast::from(a);
-        sv += av;
+        sv += &av;
     }
 }
 
