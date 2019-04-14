@@ -166,7 +166,7 @@ impl<'a> PartialEq for VastMut<'a> {
 
 impl<'a> Ord for Vast<'a> {
     fn cmp(&self, other: &Vast) -> Ordering {
-        cmp_pod(self, other)
+        self.pod_cmp(other)
     }
 }
 impl<'a> PartialOrd for Vast<'a> {

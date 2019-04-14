@@ -12,6 +12,7 @@ pub trait PodOps {
     fn bits(&self) -> BigSize;
     fn pod_eq(&self, other: &Pod) -> bool;
     fn min_limbs(&self) -> BigSize;
+    fn pod_cmp(&self, rhs: &Pod) -> Ordering;
 }
 
 impl<T> PodOps for T where T: Pod {
@@ -31,7 +32,7 @@ impl<T> PodOps for T where T: Pod {
         return b;
     }
     fn pod_eq(&self, other: &Pod) -> bool {
-        if (self.limbs() > other.limbs()) {
+        if self.limbs() > other.limbs() {
             for i in (0..self.limbs()).rev() {
                 if i < other.limbs() {
                     if self.get_limb(i) != other.get_limb(i) {
@@ -66,6 +67,41 @@ impl<T> PodOps for T where T: Pod {
         }
         return 0;
     }
+    fn pod_cmp(&self, rhs: &Pod) -> Ordering {
+        let lhs = self;
+        if lhs.limbs() > rhs.limbs() {
+            for i in (0..lhs.limbs()).rev() {
+                let lhsi = lhs.get_limb(i);
+                let rhsi : Limb;
+                if i < rhs.limbs() {
+                    rhsi = rhs.get_limb(i);
+                } else {
+                    rhsi = 0;
+                }
+                if lhsi > rhsi {
+                    return Ordering::Greater;
+                } else if lhsi < rhsi {
+                    return Ordering::Less;
+                }
+            }
+        } else {
+            for i in (0..rhs.limbs()).rev() {
+                let rhsi = rhs.get_limb(i);
+                let lhsi : Limb;
+                if i < lhs.limbs() {
+                    lhsi = lhs.get_limb(i);
+                } else {
+                    lhsi = 0;
+                }
+                if lhsi > rhsi {
+                    return Ordering::Greater;
+                } else if lhsi < rhsi {
+                    return Ordering::Less;
+                }
+            }
+        }
+        return Ordering::Equal;
+    }
 }
 
 impl Pod for Limb {
@@ -81,39 +117,5 @@ impl Pod for Limb {
     }
 }
 
-pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {
-    if lhs.limbs() > rhs.limbs() {
-        for i in (0..lhs.limbs()).rev() {
-            let lhsi = lhs.get_limb(i);
-            let rhsi : Limb;
-            if i < rhs.limbs() {
-                rhsi = rhs.get_limb(i);
-            } else {
-                rhsi = 0;
-            }
-            if lhsi > rhsi {
-                return Ordering::Greater;
-            } else if lhsi < rhsi {
-                return Ordering::Less;
-            }
-        }
-    } else {
-        for i in (0..rhs.limbs()).rev() {
-            let rhsi = rhs.get_limb(i);
-            let lhsi : Limb;
-            if i < lhs.limbs() {
-                lhsi = lhs.get_limb(i);
-            } else {
-                lhsi = 0;
-            }
-            if lhsi > rhsi {
-                return Ordering::Greater;
-            } else if lhsi < rhsi {
-                return Ordering::Less;
-            }
-        }
-    }
-    return Ordering::Equal;
-}
 
 

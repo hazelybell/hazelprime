@@ -120,7 +120,7 @@ pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
         negative = false;
         add_assign_pod(&mut dest.v, a);
     } else {
-        let c = cmp_pod(&mut dest.v, a);
+        let c = (&dest.v).pod_cmp(a);
         if c == Ordering::Greater {
             negative = true;
             sub_assign_pod(&mut dest.v, a);
@@ -138,7 +138,7 @@ pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
         negative = true;
         add_assign_pod(&mut dest.v, a);
     } else { // dest is positive
-        let c = cmp_pod(&mut dest.v, a);
+        let c = (&dest.v).pod_cmp(a);
         if c == Ordering::Greater {
             negative = false;
             sub_assign_pod(&mut dest.v, a);
