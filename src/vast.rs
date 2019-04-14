@@ -121,21 +121,12 @@ impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
-impl<'a> Pod for Vast<'a> {
+impl<'a, T> Pod for T where T: Avast {
     fn limbs(&self) -> BigSize {
-        self.length()
+        self.as_slice().len() as BigSize
     }
     fn get_limb(&self, i: BigSize) -> Limb {
-        self.v[i as usize]
-    }
-}
-
-impl<'a> Pod for VastMut<'a> {
-    fn limbs(&self) -> BigSize {
-        self.length()
-    }
-    fn get_limb(&self, i: BigSize) -> Limb {
-        self.v[i as usize]
+        self.as_slice()[i as usize]
     }
 }
 
