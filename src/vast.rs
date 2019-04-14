@@ -23,7 +23,6 @@ impl<'a> Vast<'a> {
 }
 
 pub trait AvastOps {
-    fn length(&self) -> BigSize;
     fn bits(&self) -> BigSize;
 }
 
@@ -32,9 +31,6 @@ pub trait Avast {
 }
 
 impl<'a, T> AvastOps for T where T: Avast {
-    fn length(&self) -> BigSize {
-        self.as_slice().len() as BigSize
-    }
     fn bits(&self) -> BigSize {
         let v = self.as_slice();
         let mut b : BigSize = (v.len() as BigSize) * (LIMB_SHIFT as BigSize);
@@ -131,7 +127,7 @@ impl<'a, T> Pod for T where T: Avast {
 
 pub fn add_assign_pod(dest: &mut VastMut, a: &Pod) {
     let mut carry : Limb = 0;
-    let sz = dest.length();
+    let sz = dest.limbs();
     for i in 0..sz {
         let ai: Limb;
         if i < a.limbs() {
@@ -171,7 +167,7 @@ impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
 impl<'a> AddAssign<Limb> for VastMut<'a> {
     fn add_assign(&mut self, a: Limb) {
         let mut carry : Limb = a;
-        let sz = self.length();
+        let sz = self.limbs();
         for i in 0..sz {
             let (s1, o1) = Limb::overflowing_add(self[i], carry);
             self[i] = s1;
@@ -242,7 +238,7 @@ impl<'a> VastMutOps for VastMut<'a> {
         let mut p = self;
         let a_sz = a.min_limbs();
         let b_sz = b.min_limbs();
-        let p_sz = Vast::from(&p).length();
+        let p_sz = Vast::from(&p).limbs();
         p.zero();
         assert!(p_sz >= a_sz + b_sz);
         for j in 0..b_sz {
@@ -272,7 +268,7 @@ impl<'a> VastMutOps for VastMut<'a> {
 
 pub fn sub_assign_pod(dest: &mut VastMut, a: &Pod) {
     let mut borrow : Limb = 0;
-    let sz = dest.length();
+    let sz = dest.limbs();
     for i in 0..sz {
         let s : Limb;
         let ai = a.get_limb(i);
@@ -306,7 +302,7 @@ impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
 
 pub fn backwards_sub_assign_pod(dest: &mut VastMut, a: &Pod) {
     let mut borrow : Limb = 0;
-    let sz = dest.length();
+    let sz = dest.limbs();
     for i in 0..sz {
         let s : Limb;
         // these two are flipped!

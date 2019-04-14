@@ -44,8 +44,8 @@ impl<'a> FermatOps for VastMut<'a> {
         let sz = div_up(n+1, LIMB_SIZE);
         let bit = n % LIMB_SIZE;
         let limb = n / LIMB_SIZE;
-        assert!(self.length() >= sz);
-        for i in 0..self.length() {
+        assert!(self.limbs() >= sz);
+        for i in 0..self.limbs() {
             self[i] = 0;
         }
         self[limb] = 1 << bit;

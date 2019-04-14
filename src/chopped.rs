@@ -34,7 +34,7 @@ impl<'a> Pod for Chopped<'a> {
         let src_lower_bits = LIMB_SIZE - src_bit_start;
         let src_upper_bits = src_bit_start;
         let last = sz - 1 + src_limb_start;
-        let over = last >= self.u.length();
+        let over = last >= self.u.limbs();
         let last_r_bits = (self.start + self.length - 1) % LIMB_SIZE + 1;
         let last_special = 
             self.length % LIMB_SIZE > 0 
@@ -54,7 +54,7 @@ impl<'a> Pod for Chopped<'a> {
             // the upper LIMB_SIZE - start source limb bits
             let dst_lower = self.u[src_limb_start + i] >> src_upper_bits;
             let dst_upper;
-            let over = src_limb_start + i + 1 >= self.u.length();
+            let over = src_limb_start + i + 1 >= self.u.limbs();
             if src_lower_bits < 64 && !over {
                 dst_upper = self.u[src_limb_start + i + 1]
                 << src_lower_bits;
