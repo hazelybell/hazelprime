@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};

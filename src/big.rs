@@ -116,14 +116,14 @@ impl Clone for Big {
 
 impl PartialEq for Big {
     fn eq (&self, other: &Big) -> bool {
-        Vast::from(self) == Vast::from(other)
+        self.pod_eq(other)
     }
 }
 impl Eq for Big {}
 
 impl PartialEq<Limb> for &Big {
     fn eq (&self, other: &Limb) -> bool {
-        Vast::from(*self) == *other
+        self.pod_eq(other)
     }
 }
 
@@ -135,7 +135,7 @@ impl PartialEq<Limb> for Big {
 
 impl Ord for Big {
     fn cmp(&self, other: &Big) -> Ordering {
-        Vast::from(self).cmp(&Vast::from(other))
+        self.pod_cmp(other)
     }
 }
 impl PartialOrd for Big {
@@ -146,12 +146,7 @@ impl PartialOrd for Big {
 
 impl PartialOrd<Limb> for Big {
     fn partial_cmp(&self, other: &Limb) -> Option<Ordering> {
-        for i in 1..self.v.len() {
-            if self.v[i] > 0 {
-                return Some(Ordering::Greater);
-            }
-        }
-        return Some(self.v[0].cmp(other));
+        Some(self.pod_cmp(other))
     }
 }
 

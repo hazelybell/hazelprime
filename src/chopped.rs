@@ -1,5 +1,3 @@
-// use std::ops::Index;
-
 use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};
@@ -28,7 +26,6 @@ impl<'a> Pod for Chopped<'a> {
         if i >= sz {
             panic!("Attempted to index past the end of chop: sz is {} but index is {}", sz, i);
         }
-        let mut r: Limb = 0;
         let src_limb_start = self.start / LIMB_SIZE;
         let src_bit_start = self.start % LIMB_SIZE;
         let src_lower_bits = LIMB_SIZE - src_bit_start;
