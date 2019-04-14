@@ -38,11 +38,6 @@ impl<'a> Avast for VastMut<'a> {
 }
 
 impl<'a> VastMut<'a> {
-    pub fn zero(& mut self) {
-        for i in 0..self.v.len() {
-            self.v[i] = 0;
-        }
-    }
     fn as_mut_slice(&mut self) -> &mut [Limb] {
         self.v
     }
@@ -110,20 +105,7 @@ impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
 
 impl<'a> AddAssign<Limb> for VastMut<'a> {
     fn add_assign(&mut self, a: Limb) {
-        let mut carry : Limb = a;
-        let sz = self.limbs();
-        for i in 0..sz {
-            let (s1, o1) = Limb::overflowing_add(self[i], carry);
-            self[i] = s1;
-            if o1 {
-                carry = 1;
-            } else {
-                carry = 0;
-            }
-        }
-        if carry > 0 {
-            panic!("Vast overflow in add_assign(Limb)");
-        }
+        self.pod_add_assign(&a);
     }
 }
 

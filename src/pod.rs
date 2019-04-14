@@ -124,12 +124,18 @@ pub trait PodMut: Pod {
 }
 
 pub trait PodMutOps {
+    fn zero(&mut self);
     fn pod_add_assign(&mut self, a: &Pod);
     fn pod_sub_assign(&mut self, a: &Pod);
     fn pod_backwards_sub_assign(&mut self, a: &Pod);
 }
 
 impl<T> PodMutOps for T where T: PodMut {
+    fn zero(&mut self) {
+        for i in 0..self.limbs() {
+            self.set_limb(i, 0);
+        }
+    }
     fn pod_add_assign(&mut self, a: &Pod) {
         let dest = self;
         let mut carry : Limb = 0;
@@ -221,7 +227,6 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast underflow in sub_assign(Vast)");
         }
     }
-
 }
 
 
