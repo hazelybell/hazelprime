@@ -91,8 +91,7 @@ impl<'a> FermatOps for VastMut<'a> {
 // **************************************************************************
 #[cfg(test)]
 mod tests {
-    use crate::big::{*};
-    use crate::vast_mod_f::{*};
+    use crate::fermat::{*};
     #[test]
     fn fermat_1() {
         let f = Fermat::new(64);
