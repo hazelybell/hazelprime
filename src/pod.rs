@@ -147,6 +147,7 @@ pub trait PodMutOps {
     fn pod_sub_assign(&mut self, a: &Pod);
     fn pod_backwards_sub_assign(&mut self, a: &Pod);
     fn pod_assign_mul(self, a: &PodOps, b: &PodOps);
+    fn pod_assign_hex(&mut self, src: &str);
 }
 
 impl<T> PodMutOps for T where T: PodMut {
@@ -274,6 +275,33 @@ impl<T> PodMutOps for T where T: PodMut {
             // we don't have anywhere left to put the final carry :(
             assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
             p.set_limb(a_sz+j, carry as Limb);
+        }
+    }
+    fn pod_assign_hex(&mut self, src: &str) {
+        let chunk_size = (LIMB_SIZE / 4) as usize;
+        let len = src.len();
+        let chunks = len / chunk_size;
+        let remaining = len % chunk_size;
+        let sz: BigSize;
+        if remaining > 0 {
+            sz = (chunks+1) as BigSize;
+        } else {
+            sz = chunks as BigSize;
+        }
+        assert!(sz <= self.limbs()); // make sure there's enough space
+        for i in 0..chunks {
+            let end = len - i * chunk_size;
+            let start = len - (i+1) * chunk_size;
+            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
+                .unwrap();
+            self.set_limb(i as BigSize, chunk);
+        }
+        if remaining > 0 {
+            let end = len - chunks * chunk_size;
+            let start = 0;
+            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
+                .unwrap();
+            self.set_limb(chunks as BigSize, chunk);
         }
     }
 }

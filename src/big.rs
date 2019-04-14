@@ -85,20 +85,7 @@ impl Big {
             sz = chunks as BigSize;
         }
         let mut r = Big::new(sz);
-        for i in 0..chunks {
-            let end = len - i * chunk_size;
-            let start = len - (i+1) * chunk_size;
-            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
-                .unwrap();
-            r[i as BigSize] = chunk;
-        }
-        if remaining > 0 {
-            let end = len - chunks * chunk_size;
-            let start = 0;
-            let chunk: Limb = Limb::from_str_radix(&src[start..end], 16)
-                .unwrap();
-            r[chunks as BigSize] = chunk;
-        }
+        r.pod_assign_hex(src);
         return r;
     }
     pub fn as_mut_slice(&mut self) -> &mut[Limb] {
