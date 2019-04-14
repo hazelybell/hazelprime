@@ -184,34 +184,7 @@ impl fmt::Debug for Big {
 
 impl ShlAssign<BigSize> for Big {
     fn shl_assign(&mut self, n: BigSize) {
-        assert!(self.bits() + n <= self.bitlen());
-        // rely on integer rounding down here
-        let n_limbs = n / LIMB_SIZE;
-        let n_bits = n - (n_limbs * LIMB_SIZE);
-        let sz = self.length();
-        assert!(n_limbs < sz);
-        for i in (n_limbs..sz).rev() {
-            let src_lower = i-n_limbs-1;
-            let src_upper = i-n_limbs;
-            // we need a total of LIMB_SIZE bits for each limb
-            // the upper LIMB_SIZE - n_bits of the destination comes
-            // from the lower LIMB_SIZE - n_bits of the upper source
-            let upper : Limb = self[src_upper] << n_bits;
-            let lower : Limb;
-            if src_lower < 0 || n_bits == 0 {
-                lower = 0;
-            } else {
-                // the lower n_bits of the destination comes
-                // from the upper n_bits of the source
-                // so we discard LIMB_SIZE - n_bits of the lower source
-                lower = self[src_lower] >> (LIMB_SIZE - n_bits);
-            }
-            self[i] = upper | lower;
-        }
-        for i in 0..n_limbs {
-            // zero the least significant bits
-            self[i] = 0;
-        }
+        self.pod_shl_assign(n);
     }
 }
 
@@ -298,31 +271,10 @@ impl Div for &Big {
     fn div(self, rhs: Self) -> Big {
         let n = self;
         let d = rhs;
-        if d == 0 {
-            panic!("Trying to divide by zero-valued `Big`!");
-        }
-        // do long division
-        // TODO: fix this to use u64 division instead of binary
-        // https://en.wikipedia.org/w/index.php?title=Division_algorithm&oldid=891240037#Integer_division_(unsigned)_with_remainder
         let sz = n.length();
-        if d >= n {
-            return Big::new(sz);
-        }
-        let bits = n.bits();
         let mut q = Big::new(sz);
         let mut r = Big::new(sz);
-        for i in (0..bits).rev() {
-            r <<= 1;
-            let limb_i = i/LIMB_SIZE;
-            let bit_i = i%LIMB_SIZE;
-            let mask_i : Limb = (1 as Limb) << bit_i;
-            let n_i = (n[limb_i] & mask_i) >> bit_i;
-            r[0] = r[0] | n_i;
-            if r.ge(d) {
-                r -= &d;
-                q[limb_i] = q[limb_i] | mask_i;
-            }
-        }
+        q.pod_assign_div_qr(&mut r, n, d);
         return q;
     }
 }
