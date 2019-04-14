@@ -8,7 +8,7 @@ pub trait Pod {
     fn get_limb(&self, i: BigSize) -> Limb;
 }
 
-pub trait PodOps {
+pub trait PodOps: Pod {
     fn bits(&self) -> BigSize;
     fn pod_eq(&self, other: &Pod) -> bool;
     fn min_limbs(&self) -> BigSize;
@@ -128,6 +128,7 @@ pub trait PodMutOps {
     fn pod_add_assign(&mut self, a: &Pod);
     fn pod_sub_assign(&mut self, a: &Pod);
     fn pod_backwards_sub_assign(&mut self, a: &Pod);
+    fn pod_assign_mul(self, a: &PodOps, b: &PodOps);
 }
 
 impl<T> PodMutOps for T where T: PodMut {
@@ -225,6 +226,36 @@ impl<T> PodMutOps for T where T: PodMut {
         }
         if borrow > 0 {
             panic!("Vast underflow in sub_assign(Vast)");
+        }
+    }
+    fn pod_assign_mul(self, a: &PodOps, b: &PodOps) {
+        let mut p = self;
+        let a_sz = a.min_limbs();
+        let b_sz = b.min_limbs();
+        let p_sz = p.limbs();
+        p.zero();
+        assert!(p_sz >= a_sz + b_sz);
+        for j in 0..b_sz {
+            let mut carry : Limb2 = 0;
+            for i in 0..a_sz {
+    //             println!("i: {} j: {}, i+j: {}", i, j, i + j);
+                let mut old = p.get_limb(i + j) as Limb2;
+    //             println!("old: {:X} carry: {:X}", old, carry);
+                old += carry;
+    //             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
+                let x = (a.get_limb(i) as Limb2) * (b.get_limb(j) as Limb2);
+                let new = old + x;
+    //             println!("x: {:X} new: {:X}", x, new);
+                if new < x || new < old {
+                    panic!("Wrapped!");
+                }
+                carry = new >> LIMB_SHIFT;
+                p.set_limb(i + j, (new & LIMB_MASK) as Limb);
+            }
+    //         println!("Final carry: {:X}", carry);
+            // we don't have anywhere left to put the final carry :(
+            assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
+            p.set_limb(a_sz+j, carry as Limb);
         }
     }
 }
