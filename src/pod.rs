@@ -276,9 +276,6 @@ impl<T> PodMutOps for T where T: PodMut {
             p.set_limb(a_sz+j, carry as Limb);
         }
     }
-    fn from_hex(self, src: &Str) {
-        
-    }
 }
 
 
