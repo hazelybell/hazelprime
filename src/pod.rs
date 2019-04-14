@@ -31,10 +31,29 @@ impl<T> PodOps for T where T: Pod {
         return b;
     }
     fn pod_eq(&self, other: &Pod) -> bool {
-        assert_eq!(self.limbs(), other.limbs());
-        for i in (0..self.limbs()).rev() {
-            if self.get_limb(i) != other.get_limb(i) {
-                return false;
+        if (self.limbs() > other.limbs()) {
+            for i in (0..self.limbs()).rev() {
+                if i < other.limbs() {
+                    if self.get_limb(i) != other.get_limb(i) {
+                        return false;
+                    }
+                } else {
+                    if self.get_limb(i) != 0 {
+                        return false;
+                    }
+                }
+            }
+        } else {
+            for i in (0..other.limbs()).rev() {
+                if i < self.limbs() {
+                    if self.get_limb(i) != other.get_limb(i) {
+                        return false;
+                    }
+                } else {
+                    if 0 != other.get_limb(i) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
@@ -60,13 +79,6 @@ impl Pod for Limb {
             panic!("Tried to index into a Limb other than index 0")
         }
     }
-//     fn min_limbs(&self) -> BigSize {
-//         if *self == 0 {
-//             return 0;
-//         } else {
-//             return 1;
-//         }
-//     }
 }
 
 pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {
