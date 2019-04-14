@@ -11,6 +11,12 @@ pub struct Fermat {
     pub n: BigSize
 }
 
+impl Fermat {
+    pub fn new(n: BigSize) -> Fermat {
+        Fermat {n: n}
+    }
+}
+
 impl Pod for Fermat {
     fn limbs(&self) -> BigSize {
         let sz = div_up(self.n+1, LIMB_SIZE);
@@ -39,18 +45,6 @@ pub trait FermatOps {
 }
 
 impl<'a> FermatOps for VastMut<'a> {
-    fn fermat(&mut self, n: BigSize) {
-        let sz = div_up(n+1, LIMB_SIZE);
-        let bit = n % LIMB_SIZE;
-        let limb = n / LIMB_SIZE;
-        assert!(self.limbs() >= sz);
-        for i in 0..self.limbs() {
-            self[i] = 0;
-        }
-        self[limb] = 1 << bit;
-        self[0] |= 1;
-    }
-    
     fn mod_fermat(self, f: Fermat, mut temp: VastMut) {
         temp.zero();
         let sz = f.limbs();
@@ -93,12 +87,9 @@ mod tests {
     use crate::vast_mod_f::{*};
     #[test]
     fn fermat_1() {
-        let mut fb = Big::new(2);
-        let mut f = VastMut::from(&mut fb);
-        f.fermat(64);
-        assert_eq!(fb.hex_str(),"10000000000000001");
-        let mut f = VastMut::from(&mut fb);
-        f.fermat(32);
-        assert_eq!(fb.hex_str(),"100000001");
+        let f = Fermat::new(64);
+        assert_eq!(f.to_hex(),"10000000000000001");
+        let f = Fermat::new(32);
+        assert_eq!(f.to_hex(),"100000001");
     }
 }
