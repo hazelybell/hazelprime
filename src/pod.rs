@@ -262,8 +262,13 @@ impl<T> PodMutOps for T where T: PodMut {
         let mut borrow : Limb = 0;
         let sz = dest.limbs();
         for i in 0..sz {
-            let s : Limb;
-            let ai = a.get_limb(i);
+            let s: Limb;
+            let ai: Limb;
+            if i < a.limbs() {
+                ai = a.get_limb(i);
+            } else {
+                ai = 0;
+            }
             let di = dest.get_limb(i);
             s = di.wrapping_sub(borrow);
             if di >= borrow {
@@ -294,7 +299,12 @@ impl<T> PodMutOps for T where T: PodMut {
             let s : Limb;
             // these two are flipped!
             let ai = dest.get_limb(i);
-            let di = a.get_limb(i);
+            let di: Limb;
+            if i < a.limbs() {
+                di = a.get_limb(i);
+            } else {
+                di = 0;
+            }
             s = di.wrapping_sub(borrow);
             if di >= borrow {
                 borrow = 0;

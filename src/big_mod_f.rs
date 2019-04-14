@@ -1,8 +1,9 @@
 use crate::limb::{*};
 use crate::big::{*};
 use crate::sbig::{*};
-// use crate::vast::{*};
-// use crate::fermat::{*};
+use crate::vast::{*};
+use crate::svast::{*};
+use crate::fermat::{*};
 
 pub fn fermat(n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
@@ -15,43 +16,8 @@ pub fn fermat(n : BigSize) -> Big {
 pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
     let mut plus = Big::new(sz);
-    let mut minus = Big::new(sz);
-    let src_bits = x.bitlen();
-    let iters = div_up(src_bits, n);
-//     println!("src_bits: {}, iters: {}", src_bits, iters);
-    for i in 0..iters {
-        let chunk: BigSize;
-        if (n*i + n) > src_bits {
-            chunk = src_bits - n*i;
-        } else {
-            chunk = n;
-        }
-        if chunk == 0 {
-            break;
-        }
-//         println!("start: {} len: {}", n*i, chunk);
-        let piece = x.slice_bits(n*i, chunk);
-//         println!("start: {} len: {} piece: {}", n*i, n, piece);
-        if i % 2 == 0 { // even
-            plus += &piece;
-//             println!("plus: {}", plus)
-        } else { // odd
-            minus += &piece;
-//             println!("minus: {}", minus)
-        }
-    }
-    let f = fermat(n);
-    if plus.lt(&minus) {
-        plus += &f;
-    }
-    plus -= &minus;
-    if f.lt(&plus) {
-        println!("{}<{}", f, plus);
-        plus -= &f;
-    }
-    if f.lt(&plus) {
-        panic!("Reducing mod fermat still too big :(");
-    }
+    let mut sv = SVastMut{v: VastMut{v: plus.as_mut_slice()}, negative: false};
+    sv.assign_mod_fermat(&Vast::from(x), Fermat::new(n));
     return plus;
 }
 

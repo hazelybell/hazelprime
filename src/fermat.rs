@@ -49,7 +49,7 @@ impl<'a> FermatOps for SVastMut<'a> {
     fn assign_mod_fermat(&mut self, src: &Vast, f: Fermat) {
         self.zero();
         let sz = f.limbs();
-        let mut mod_f = self;
+        let mod_f = self;
         let src_bits = src.bits();
         let iters = div_up(src_bits, f.n);
         for i in 0..iters {
@@ -64,12 +64,15 @@ impl<'a> FermatOps for SVastMut<'a> {
             }
             let piece = Chopped::chop(src.clone(), f.n*i, chunk);
             if i % 2 == 0 {
+//                 println!("i={} +{}", i, piece.to_hex());
                 mod_f.pod_add_assign(&piece);
             } else {
+//                 println!("i={} -{}", i, piece.to_hex());
                 mod_f.pod_sub_assign(&piece);
             }
+//             println!("mod_f: {}", mod_f);
         }
-        if mod_f.negative {
+        if mod_f.negative && !mod_f.v.eq(&0) {
             mod_f.pod_add_assign(&f);
             if mod_f.negative {
                 panic!("Still negative!");

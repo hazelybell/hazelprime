@@ -1,6 +1,7 @@
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::cmp::Ordering;
+use std::fmt;
 // use std::ops::Add;
 // use std::ops::Sub;
 
@@ -15,7 +16,7 @@ pub struct SVast<'a> {
 }
 
 pub struct SVastMut<'a> {
-    v: VastMut<'a>,
+    pub v: VastMut<'a>,
     pub negative: bool
 }
 
@@ -169,6 +170,16 @@ impl<'a> SVastMut<'a> {
             }
         }
         self.negative = negative;
+    }
+}
+
+impl<'a> fmt::Display for SVastMut<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.negative {
+            write!(f, "-{}", self.v.to_hex())
+        } else {
+            write!(f, "+{}", self.v.to_hex())
+        }
     }
 }
 
