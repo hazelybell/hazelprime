@@ -243,25 +243,19 @@ impl ShrAssign<BigSize> for Big {
 
 impl AddAssign<&Big> for Big {
     fn add_assign(&mut self, a : &Big) {
-        let mut sv = VastMut::from(self);
-        let av = Vast::from(a);
-        sv += av;
+        self.pod_add_assign(a);
     }
 }
 
 impl AddAssign<Limb> for Big {
     fn add_assign(&mut self, a: Limb) {
-        let mut sv = VastMut::from(self);
-        sv += a;
+        self.pod_add_assign(&a);
     }
 }
 
 impl SubAssign<&Big> for Big {
     fn sub_assign(&mut self, a : &Big) {
-//         println!("{:?}-{:?}", self, a);
-        let mut sv = VastMut::from(self);
-        let av = Vast::from(a);
-        sv -= av;
+        self.pod_sub_assign(a);
     }
 }
 
