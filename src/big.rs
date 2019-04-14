@@ -274,12 +274,9 @@ impl Mul for Big {
     
     fn mul(self, rhs: Self) -> Self {
         let self_sz = self.v.len();
-        let a = Vast::from(&self);
         let rhs_sz = rhs.v.len();
-        let b = Vast::from(&rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = VastMut::from(&mut pb);
-        p.assign_mul(a, b);
+        pb.pod_assign_mul(&self, &rhs);
         return pb;
     }
 }
@@ -289,12 +286,9 @@ impl Mul for &Big {
     
     fn mul(self, rhs: Self) -> Big {
         let self_sz = self.v.len();
-        let a = Vast::from(self);
         let rhs_sz = rhs.v.len();
-        let b = Vast::from(rhs);
         let mut pb = Big::new((self_sz + rhs_sz) as BigSize);
-        let p = VastMut::from(&mut pb);
-        p.assign_mul(a, b);
+        pb.pod_assign_mul(self, rhs);
         return pb;
     }
 }

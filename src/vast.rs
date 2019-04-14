@@ -145,11 +145,11 @@ impl<'a> PartialEq<Limb> for VastMut<'a> {
 }
 
 pub trait VastMutOps {
-    fn assign_mul(self, a: Vast, b: Vast);
+    fn assign_mul(&mut self, a: Vast, b: Vast);
 }
 
 impl<'a> VastMutOps for VastMut<'a> {
-    fn assign_mul(self, a: Vast, b: Vast) {
+    fn assign_mul(&mut self, a: Vast, b: Vast) {
         self.pod_assign_mul(&a, &b);
     }
 }

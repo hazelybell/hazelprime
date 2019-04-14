@@ -146,7 +146,7 @@ pub trait PodMutOps {
     fn pod_add_assign(&mut self, a: &Pod);
     fn pod_sub_assign(&mut self, a: &Pod);
     fn pod_backwards_sub_assign(&mut self, a: &Pod);
-    fn pod_assign_mul(self, a: &PodOps, b: &PodOps);
+    fn pod_assign_mul(&mut self, a: &PodOps, b: &PodOps);
     fn pod_assign_hex(&mut self, src: &str);
 }
 
@@ -247,8 +247,8 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast underflow in sub_assign(Vast)");
         }
     }
-    fn pod_assign_mul(self, a: &PodOps, b: &PodOps) {
-        let mut p = self;
+    fn pod_assign_mul(&mut self, a: &PodOps, b: &PodOps) {
+        let p = self;
         let a_sz = a.min_limbs();
         let b_sz = b.min_limbs();
         let p_sz = p.limbs();
