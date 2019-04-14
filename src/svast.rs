@@ -116,6 +116,10 @@ impl<'a> PartialOrd for SVast<'a> {
 }
 
 impl<'a> SVastMut<'a> {
+    pub fn zero(&mut self) {
+        self.v.zero();
+        self.negative = false;
+    }
     pub fn pod_cmp(&self, other: &PodOps) -> Ordering {
         if self.negative {
             if self.v.pod_eq(&0) {

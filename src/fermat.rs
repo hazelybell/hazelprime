@@ -42,14 +42,14 @@ impl Pod for Fermat {
 
 pub trait FermatOps {
 //     fn add_fermat(&mut self, n: BigSize);
-    fn assign_mod_fermat(self, src: &Vast, f: Fermat);
+    fn assign_mod_fermat(&mut self, src: &Vast, f: Fermat);
 }
 
-impl<'a> FermatOps for VastMut<'a> {
-    fn assign_mod_fermat(mut self, src: &Vast, f: Fermat) {
+impl<'a> FermatOps for SVastMut<'a> {
+    fn assign_mod_fermat(&mut self, src: &Vast, f: Fermat) {
         self.zero();
         let sz = f.limbs();
-        let mut mod_f = SVastMut::from(self);
+        let mut mod_f = self;
         let src_bits = src.bits();
         let iters = div_up(src_bits, f.n);
         for i in 0..iters {
