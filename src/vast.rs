@@ -23,7 +23,6 @@ impl<'a> Vast<'a> {
 }
 
 pub trait AvastOps {
-    fn min_length(&self) -> BigSize;
     fn length(&self) -> BigSize;
     fn bits(&self) -> BigSize;
 }
@@ -33,15 +32,6 @@ pub trait Avast {
 }
 
 impl<'a, T> AvastOps for T where T: Avast {
-    fn min_length(&self) -> BigSize {
-        let v = self.as_slice();
-        for i in (0..v.len()).rev() {
-            if v[i] != 0 {
-                return (i + 1) as BigSize;
-            }
-        }
-        return 0;
-    }
     fn length(&self) -> BigSize {
         self.as_slice().len() as BigSize
     }
@@ -250,8 +240,8 @@ pub trait VastMutOps {
 impl<'a> VastMutOps for VastMut<'a> {
     fn assign_mul(self, a: Vast, b: Vast) {
         let mut p = self;
-        let a_sz = a.min_length();
-        let b_sz = b.min_length();
+        let a_sz = a.min_limbs();
+        let b_sz = b.min_limbs();
         let p_sz = Vast::from(&p).length();
         p.zero();
         assert!(p_sz >= a_sz + b_sz);
