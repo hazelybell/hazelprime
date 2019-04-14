@@ -117,5 +117,111 @@ impl Pod for Limb {
     }
 }
 
+// Mutable stuff **********************************************************
+
+pub trait PodMut: Pod {
+    fn set_limb(&mut self, i: BigSize, l: Limb);
+}
+
+pub trait PodMutOps {
+    fn pod_add_assign(&mut self, a: &Pod);
+    fn pod_sub_assign(&mut self, a: &Pod);
+    fn pod_backwards_sub_assign(&mut self, a: &Pod);
+}
+
+impl<T> PodMutOps for T where T: PodMut {
+    fn pod_add_assign(&mut self, a: &Pod) {
+        let dest = self;
+        let mut carry : Limb = 0;
+        let sz = dest.limbs();
+        for i in 0..sz {
+            let ai: Limb;
+            if i < a.limbs() {
+                ai = a.get_limb(i);
+            } else {
+                ai = 0;
+            }
+            let (s1, o1) = Limb::overflowing_add(dest.get_limb(i), carry);
+            let (s2, o2) = Limb::overflowing_add(s1, ai);
+            dest.set_limb(i, s2);
+            if o1 {
+                carry = 1;
+            } else {
+                carry = 0;
+            }
+            if o2 {
+                carry += 1;
+            }
+        }
+        for i in sz..a.limbs() {
+            if a.get_limb(i) != 0 {
+                panic!("Vast overflow in add_assign(Vast): other too long!")
+            }
+        }
+        if carry > 0 {
+            panic!("Vast overflow in add_assign(Vast)!");
+        }
+    }
+    fn pod_sub_assign(&mut self, a: &Pod) {
+        let dest = self;
+        let mut borrow : Limb = 0;
+        let sz = dest.limbs();
+        for i in 0..sz {
+            let s : Limb;
+            let ai = a.get_limb(i);
+            let di = dest.get_limb(i);
+            s = di.wrapping_sub(borrow);
+            if di >= borrow {
+                borrow = 0;
+            } else {
+                borrow = 1;
+            }
+            let s2 = s.wrapping_sub(ai);
+            if s < ai {
+                borrow = borrow + 1;
+            }
+            dest.set_limb(i, s2);
+        }
+        for i in sz..a.limbs() {
+            if a.get_limb(i) != 0 {
+                panic!("Vast underflow in sub_assign(Vast): other too long")
+            }
+        }
+        if borrow > 0 {
+            panic!("Vast underflow in sub_assign(Vast)");
+        }
+    }
+    fn pod_backwards_sub_assign(&mut self, a: &Pod) {
+        let dest = self;
+        let mut borrow : Limb = 0;
+        let sz = dest.limbs();
+        for i in 0..sz {
+            let s : Limb;
+            // these two are flipped!
+            let ai = dest.get_limb(i);
+            let di = a.get_limb(i);
+            s = di.wrapping_sub(borrow);
+            if di >= borrow {
+                borrow = 0;
+            } else {
+                borrow = 1;
+            }
+            let s2 = s.wrapping_sub(ai);
+            if s < ai {
+                borrow = borrow + 1;
+            }
+            dest.set_limb(i, s2);
+        }
+        for i in sz..a.limbs() {
+            if a.get_limb(i) != 0 {
+                panic!("Vast underflow in sub_assign(Vast): other too long")
+            }
+        }
+        if borrow > 0 {
+            panic!("Vast underflow in sub_assign(Vast)");
+        }
+    }
+
+}
 
 

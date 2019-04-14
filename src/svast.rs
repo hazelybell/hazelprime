@@ -118,15 +118,15 @@ pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
     let negative: bool;
     if !dest.negative {
         negative = false;
-        add_assign_pod(&mut dest.v, a);
+        dest.v.pod_add_assign(a);
     } else {
         let c = (&dest.v).pod_cmp(a);
         if c == Ordering::Greater {
             negative = true;
-            sub_assign_pod(&mut dest.v, a);
+            dest.v.pod_sub_assign(a);
         } else {
             negative = false;
-            backwards_sub_assign_pod(&mut dest.v, a);
+            dest.v.pod_backwards_sub_assign(a);
         }
     }
     dest.negative = negative;
@@ -136,15 +136,15 @@ pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
     let negative: bool;
     if dest.negative {
         negative = true;
-        add_assign_pod(&mut dest.v, a);
+        dest.v.pod_add_assign(a);
     } else { // dest is positive
         let c = (&dest.v).pod_cmp(a);
         if c == Ordering::Greater {
             negative = false;
-            sub_assign_pod(&mut dest.v, a);
+            dest.v.pod_sub_assign(a);
         } else {
             negative = true;
-            backwards_sub_assign_pod(&mut dest.v, a);
+            dest.v.pod_backwards_sub_assign(a);
         }
     }
     dest.negative = negative;
