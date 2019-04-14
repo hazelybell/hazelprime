@@ -8,6 +8,7 @@ use std::cmp::Ordering;
 use std::ops::SubAssign;
 
 use crate::limb::{*};
+use crate::pod::{*};
 use crate::big::Big;
 
 pub struct VastMut<'a> {
@@ -120,11 +121,6 @@ impl<'a> IndexMut<BigSize> for VastMut<'a> {
     fn index_mut(&mut self, i: BigSize) -> &mut Limb { &mut self.v[i as usize] }
 }
 
-pub trait Pod {
-    fn limbs(&self) -> BigSize;
-    fn get_limb(&self, i: BigSize) -> Limb;
-}
-
 impl<'a> Pod for Vast<'a> {
     fn limbs(&self) -> BigSize {
         self.length()
@@ -218,41 +214,6 @@ impl<'a> PartialEq for VastMut<'a> {
     fn eq (&self, other: &VastMut) -> bool {
         Vast::from(self).eq(&Vast::from(other))
     }
-}
-
-pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {
-    if lhs.limbs() > rhs.limbs() {
-        for i in (0..lhs.limbs()).rev() {
-            let lhsi = lhs.get_limb(i);
-            let rhsi : Limb;
-            if i < rhs.limbs() {
-                rhsi = rhs.get_limb(i);
-            } else {
-                rhsi = 0;
-            }
-            if lhsi > rhsi {
-                return Ordering::Greater;
-            } else if lhsi < rhsi {
-                return Ordering::Less;
-            }
-        }
-    } else {
-        for i in (0..rhs.limbs()).rev() {
-            let rhsi = rhs.get_limb(i);
-            let lhsi : Limb;
-            if i < lhs.limbs() {
-                lhsi = lhs.get_limb(i);
-            } else {
-                lhsi = 0;
-            }
-            if lhsi > rhsi {
-                return Ordering::Greater;
-            } else if lhsi < rhsi {
-                return Ordering::Less;
-            }
-        }
-    }
-    return Ordering::Equal;
 }
 
 impl<'a> Ord for Vast<'a> {
