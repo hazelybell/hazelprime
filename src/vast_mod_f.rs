@@ -3,13 +3,39 @@ use crate::vast::{*};
 use crate::svast::{*};
 use crate::chopped::{*};
 
-pub trait Fermat {
-    fn fermat(&mut self, n: BigSize);
-//     fn add_fermat(&mut self, n: BigSize);
-    fn mod_fermat(self, n: BigSize, temp: VastMut);
+#[derive(Clone,Copy,Debug)]
+pub struct Fermat {
+    pub n: BigSize
 }
 
-impl<'a> Fermat for VastMut<'a> {
+impl Pod for Fermat {
+    fn limbs(&self) -> BigSize {
+        let sz = div_up(self.n+1, LIMB_SIZE);
+        return sz;
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
+        let n = self.n;
+        let sz = div_up(n+1, LIMB_SIZE);
+        let bit = n % LIMB_SIZE;
+        let limb = n / LIMB_SIZE;
+        let mut l: Limb = 0;
+        if i == 0 {
+            l |= 1;
+        }
+        if i == limb {
+            l |= 1 << bit;
+        }
+        return l;
+    }
+}
+
+pub trait FermatOps {
+    fn fermat(&mut self, n: BigSize);
+//     fn add_fermat(&mut self, n: BigSize);
+    fn mod_fermat(self, f: Fermat, temp: VastMut);
+}
+
+impl<'a> FermatOps for VastMut<'a> {
     fn fermat(&mut self, n: BigSize) {
         let sz = div_up(n+1, LIMB_SIZE);
         let bit = n % LIMB_SIZE;
@@ -22,44 +48,33 @@ impl<'a> Fermat for VastMut<'a> {
         self[0] |= 1;
     }
     
-//     fn add_fermat(&mut self, n: BigSize) {
-//         assert_ne!(n, 0)
-//         let mut carry : Limb = 1;
-//         let sz = self.length();
-//         let bit = n % LIMB_SIZE;
-//         let limb = n / LIMB_SIZE;
-//         for i in 0..sz {
-//             if i == limb {
-//                 carry += 1 << bit;
-//                 // TODO: Finish me
-//             }
-//         }
-//     }
-    
-    fn mod_fermat(self, n: BigSize, mut temp: VastMut) {
+    fn mod_fermat(self, f: Fermat, mut temp: VastMut) {
         temp.zero();
-        let sz = div_up(n+1, LIMB_SIZE);
-        let mut f = SVastMut::from(temp);
+        let sz = f.limbs();
+        let mut mod_f = SVastMut::from(temp);
         let src_bits = self.bits();
-        let iters = div_up(src_bits, n);
+        let iters = div_up(src_bits, f.n);
         for i in 0..iters {
             let chunk: BigSize;
-            if (n*i + n) > src_bits {
-                chunk = src_bits - n*i;
+            if (f.n*i + f.n) > src_bits {
+                chunk = src_bits - f.n*i;
             } else {
-                chunk = n;
+                chunk = f.n;
             }
             if chunk == 0 {
                 break;
             }
-            let piece = Chopped::chop(Vast::from(&self), n*i, chunk);
+            let piece = Chopped::chop(Vast::from(&self), f.n*i, chunk);
             if i % 2 == 0 {
-                add_assign_svast_pod(&mut f, &piece);
+                add_assign_svast_pod(&mut mod_f, &piece);
             } else {
-                sub_assign_svast_pod(&mut f, &piece);
+                sub_assign_svast_pod(&mut mod_f, &piece);
             }
-            if f.negative {
-                panic!("TODO: implement");
+            if mod_f.negative {
+                add_assign_svast_pod(&mut mod_f, &f);
+            }
+            if mod_f.negative {
+                panic!("Still negative!");
             }
             panic!("TODO: implement")
         }
