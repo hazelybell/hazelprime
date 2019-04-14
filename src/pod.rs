@@ -10,14 +10,19 @@ pub trait Pod {
 }
 
 pub trait PodOps: Pod {
+    fn bitlen(&self) -> BigSize;
     fn bits(&self) -> BigSize;
     fn pod_eq(&self, other: &Pod) -> bool;
     fn min_limbs(&self) -> BigSize;
-    fn pod_cmp(&self, rhs: &Pod) -> Ordering;
+    fn pod_cmp(&self, rhs: &PodOps) -> Ordering;
+    fn pod_ge(&self, rhs: &PodOps) -> bool;
     fn to_hex(&self) -> String;
 }
 
 impl<T> PodOps for T where T: Pod {
+    fn bitlen(&self) -> BigSize {
+        return self.limbs() * LIMB_SIZE;
+    }
     fn bits(&self) -> BigSize {
         let mut b : BigSize = (self.limbs()) * (LIMB_SHIFT as BigSize);
         for i in (0..self.limbs()).rev() {
@@ -69,7 +74,7 @@ impl<T> PodOps for T where T: Pod {
         }
         return 0;
     }
-    fn pod_cmp(&self, rhs: &Pod) -> Ordering {
+    fn pod_cmp(&self, rhs: &PodOps) -> Ordering {
         let lhs = self;
         if lhs.limbs() > rhs.limbs() {
             for i in (0..lhs.limbs()).rev() {
@@ -103,6 +108,14 @@ impl<T> PodOps for T where T: Pod {
             }
         }
         return Ordering::Equal;
+    }
+    fn pod_ge(&self, rhs: &PodOps) -> bool {
+        let c = self.pod_cmp(rhs);
+        if c == Ordering::Less {
+            return false;
+        } else {
+            return true;
+        }
     }
     fn to_hex(&self) -> String {
         let mut z = true;
@@ -141,12 +154,14 @@ pub trait PodMut: Pod {
     fn set_limb(&mut self, i: BigSize, l: Limb);
 }
 
-pub trait PodMutOps {
+pub trait PodMutOps: PodMut + PodOps {
     fn zero(&mut self);
-    fn pod_add_assign(&mut self, a: &Pod);
-    fn pod_sub_assign(&mut self, a: &Pod);
-    fn pod_backwards_sub_assign(&mut self, a: &Pod);
+    fn pod_shl_assign(&mut self, n: BigSize);
+    fn pod_add_assign(&mut self, a: &PodOps);
+    fn pod_sub_assign(&mut self, a: &PodOps);
+    fn pod_backwards_sub_assign(&mut self, a: &PodOps);
     fn pod_assign_mul(&mut self, a: &PodOps, b: &PodOps);
+    fn pod_assign_div_qr(&mut self, r: &mut PodMutOps, n: &PodOps, d: &PodOps);
     fn pod_assign_hex(&mut self, src: &str);
 }
 
@@ -156,7 +171,37 @@ impl<T> PodMutOps for T where T: PodMut {
             self.set_limb(i, 0);
         }
     }
-    fn pod_add_assign(&mut self, a: &Pod) {
+    fn pod_shl_assign(&mut self, n: BigSize) {
+        assert!(self.bits() + n <= self.bitlen());
+        // rely on integer rounding down here
+        let n_limbs = n / LIMB_SIZE;
+        let n_bits = n - (n_limbs * LIMB_SIZE);
+        let sz = self.limbs();
+        assert!(n_limbs < sz);
+        for i in (n_limbs..sz).rev() {
+            let src_lower = i-n_limbs-1;
+            let src_upper = i-n_limbs;
+            // we need a total of LIMB_SIZE bits for each limb
+            // the upper LIMB_SIZE - n_bits of the destination comes
+            // from the lower LIMB_SIZE - n_bits of the upper source
+            let upper : Limb = self.get_limb(src_upper) << n_bits;
+            let lower : Limb;
+            if src_lower < 0 || n_bits == 0 {
+                lower = 0;
+            } else {
+                // the lower n_bits of the destination comes
+                // from the upper n_bits of the source
+                // so we discard LIMB_SIZE - n_bits of the lower source
+                lower = self.get_limb(src_lower) >> (LIMB_SIZE - n_bits);
+            }
+            self.set_limb(i, upper | lower);
+        }
+        for i in 0..n_limbs {
+            // zero the least significant bits
+            self.set_limb(i, 0);
+        }
+    }
+    fn pod_add_assign(&mut self, a: &PodOps) {
         let dest = self;
         let mut carry : Limb = 0;
         let sz = dest.limbs();
@@ -188,7 +233,7 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast overflow in add_assign(Vast)!");
         }
     }
-    fn pod_sub_assign(&mut self, a: &Pod) {
+    fn pod_sub_assign(&mut self, a: &PodOps) {
         let dest = self;
         let mut borrow : Limb = 0;
         let sz = dest.limbs();
@@ -217,7 +262,7 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast underflow in sub_assign(Vast)");
         }
     }
-    fn pod_backwards_sub_assign(&mut self, a: &Pod) {
+    fn pod_backwards_sub_assign(&mut self, a: &PodOps) {
         let dest = self;
         let mut borrow : Limb = 0;
         let sz = dest.limbs();
@@ -275,6 +320,37 @@ impl<T> PodMutOps for T where T: PodMut {
             // we don't have anywhere left to put the final carry :(
             assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
             p.set_limb(a_sz+j, carry as Limb);
+        }
+    }
+    fn pod_assign_div_qr(&mut self, r: &mut PodMutOps, n: &PodOps, d: &PodOps) {
+        let q = self;
+        if d.pod_eq(&0) {
+            panic!("Trying to divide by zero-valued `PodOps`!");
+        }
+        q.zero();
+        r.zero();
+        // do long division
+        // TODO: fix this to use u64 division instead of binary
+        // https://en.wikipedia.org/w/index.php?title=Division_algorithm&oldid=891240037#Integer_division_(unsigned)_with_remainder
+        let sz = n.limbs();
+        if d.pod_ge(n) {
+            return;
+        }
+        let bits = n.bits();
+        assert!(q.limbs() >= sz);
+        assert!(r.limbs() >= sz);
+        for i in (0..bits).rev() {
+            r.pod_shl_assign(1);
+            let limb_i = i/LIMB_SIZE;
+            let bit_i = i%LIMB_SIZE;
+            let mask_i : Limb = (1 as Limb) << bit_i;
+            let n_limb_i = n.get_limb(limb_i);
+            let n_i = (n_limb_i & mask_i) >> bit_i;
+            r.set_limb(0, r.get_limb(0) | n_i);
+            if r.pod_ge(d) {
+                r.pod_sub_assign(d);
+                q.set_limb(limb_i, q.get_limb(limb_i) | mask_i);
+            }
         }
     }
     fn pod_assign_hex(&mut self, src: &str) {

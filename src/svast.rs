@@ -114,7 +114,7 @@ impl<'a> PartialOrd for SVast<'a> {
     }
 }
 
-pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
+pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &PodOps) {
     let negative: bool;
     if !dest.negative {
         negative = false;
@@ -132,7 +132,7 @@ pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
     dest.negative = negative;
 }
 
-pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &Pod) {
+pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &PodOps) {
     let negative: bool;
     if dest.negative {
         negative = true;
