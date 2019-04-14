@@ -157,6 +157,7 @@ pub trait PodMut: Pod {
 pub trait PodMutOps: PodMut + PodOps {
     fn zero(&mut self);
     fn pod_shl_assign(&mut self, n: BigSize);
+    fn pod_shr_assign(&mut self, n: BigSize);
     fn pod_add_assign(&mut self, a: &PodOps);
     fn pod_sub_assign(&mut self, a: &PodOps);
     fn pod_backwards_sub_assign(&mut self, a: &PodOps);
@@ -199,6 +200,29 @@ impl<T> PodMutOps for T where T: PodMut {
         for i in 0..n_limbs {
             // zero the least significant bits
             self.set_limb(i, 0);
+        }
+    }
+    fn pod_shr_assign(&mut self, n: BigSize) {
+        // rely on integer rounding down here
+        let n_limbs = n / LIMB_SIZE;
+        let n_bits = n - (n_limbs * LIMB_SIZE);
+        let sz = self.limbs();
+        let limbs_remaining = sz - n_limbs;
+        assert!(n_limbs < sz);
+        for i in 0..limbs_remaining {
+            let src_lower = i + n_limbs;
+            let src_upper = i + n_limbs + 1;
+            let lower = self.get_limb(src_lower) >> n_bits;
+            let upper : Limb;
+            if src_upper >= sz || n_bits == 0 {
+                upper = 0;
+            } else {
+                upper = self.get_limb(src_upper) << (LIMB_SIZE - n_bits);
+            }
+            self.set_limb(i, upper | lower);
+        }
+        for i in limbs_remaining..sz {
+            self.set_limb(i, 0); // zero the most significant bits
         }
     }
     fn pod_add_assign(&mut self, a: &PodOps) {

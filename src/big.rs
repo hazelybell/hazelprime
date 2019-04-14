@@ -190,27 +190,7 @@ impl ShlAssign<BigSize> for Big {
 
 impl ShrAssign<BigSize> for Big {
     fn shr_assign(&mut self, n: BigSize) {
-        // rely on integer rounding down here
-        let n_limbs = n / LIMB_SIZE;
-        let n_bits = n - (n_limbs * LIMB_SIZE);
-        let sz = self.length();
-        let limbs_remaining = sz - n_limbs;
-        assert!(n_limbs < sz);
-        for i in 0..limbs_remaining {
-            let src_lower = i + n_limbs;
-            let src_upper = i + n_limbs + 1;
-            let lower = self[src_lower] >> n_bits;
-            let upper : Limb;
-            if src_upper >= sz || n_bits == 0 {
-                upper = 0;
-            } else {
-                upper = self[src_upper] << (LIMB_SIZE - n_bits);
-            }
-            self[i] = upper | lower;
-        }
-        for i in limbs_remaining..sz {
-            self[i] = 0; // zero the most significant bits
-        }
+        self.pod_shr_assign(n);
     }
 }
 
