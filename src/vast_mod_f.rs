@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::cmp::Ordering;
+
 use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};
@@ -39,7 +41,6 @@ impl Pod for Fermat {
 }
 
 pub trait FermatOps {
-    fn fermat(&mut self, n: BigSize);
 //     fn add_fermat(&mut self, n: BigSize);
     fn mod_fermat(self, f: Fermat, temp: VastMut);
 }
@@ -63,18 +64,25 @@ impl<'a> FermatOps for VastMut<'a> {
             }
             let piece = Chopped::chop(Vast::from(&self), f.n*i, chunk);
             if i % 2 == 0 {
-                add_assign_svast_pod(&mut mod_f, &piece);
+                mod_f.pod_add_assign(&piece);
             } else {
-                sub_assign_svast_pod(&mut mod_f, &piece);
+                mod_f.pod_sub_assign(&piece);
             }
-            if mod_f.negative {
-                add_assign_svast_pod(&mut mod_f, &f);
-            }
+        }
+        if mod_f.negative {
+            mod_f.pod_add_assign(&f);
             if mod_f.negative {
                 panic!("Still negative!");
             }
-            panic!("TODO: implement")
+        } else {
+            if mod_f.pod_cmp(&f) != Ordering::Less {
+                mod_f.pod_sub_assign(&f);
+                if mod_f.pod_cmp(&f) != Ordering::Less {
+                    panic!("Still too big!")
+                }
+            }
         }
+        panic!("TODO: implement")
     }
 }
 

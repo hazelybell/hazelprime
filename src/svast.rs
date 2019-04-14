@@ -114,38 +114,56 @@ impl<'a> PartialOrd for SVast<'a> {
     }
 }
 
-pub fn add_assign_svast_pod(dest: &mut SVastMut, a: &PodOps) {
-    let negative: bool;
-    if !dest.negative {
-        negative = false;
-        dest.v.pod_add_assign(a);
-    } else {
-        let c = (&dest.v).pod_cmp(a);
-        if c == Ordering::Greater {
-            negative = true;
-            dest.v.pod_sub_assign(a);
+impl<'a> SVastMut<'a> {
+    pub fn pod_cmp(&self, other: &PodOps) -> Ordering {
+        if self.negative {
+            if self.v.pod_eq(&0) {
+                if other.pod_eq(&0) {
+                    Ordering::Equal
+                } else {
+                    Ordering::Less
+                }
+            } else {
+                Ordering::Less
+            }
         } else {
-            negative = false;
-            dest.v.pod_backwards_sub_assign(a);
+            self.v.pod_cmp(other)
         }
     }
-    dest.negative = negative;
+    pub fn pod_add_assign(&mut self, a: &PodOps) {
+        let negative: bool;
+        if !self.negative {
+            negative = false;
+            self.v.pod_add_assign(a);
+        } else {
+            let c = (&self.v).pod_cmp(a);
+            if c == Ordering::Greater {
+                negative = true;
+                self.v.pod_sub_assign(a);
+            } else {
+                negative = false;
+                self.v.pod_backwards_sub_assign(a);
+            }
+        }
+        self.negative = negative;
+    }
+
+    pub fn pod_sub_assign(&mut self, a: &PodOps) {
+        let negative: bool;
+        if self.negative {
+            negative = true;
+            self.v.pod_add_assign(a);
+        } else { // self is positive
+            let c = (&self.v).pod_cmp(a);
+            if c == Ordering::Greater {
+                negative = false;
+                self.v.pod_sub_assign(a);
+            } else {
+                negative = true;
+                self.v.pod_backwards_sub_assign(a);
+            }
+        }
+        self.negative = negative;
+    }
 }
 
-pub fn sub_assign_svast_pod(dest: &mut SVastMut, a: &PodOps) {
-    let negative: bool;
-    if dest.negative {
-        negative = true;
-        dest.v.pod_add_assign(a);
-    } else { // dest is positive
-        let c = (&dest.v).pod_cmp(a);
-        if c == Ordering::Greater {
-            negative = false;
-            dest.v.pod_sub_assign(a);
-        } else {
-            negative = true;
-            dest.v.pod_backwards_sub_assign(a);
-        }
-    }
-    dest.negative = negative;
-}

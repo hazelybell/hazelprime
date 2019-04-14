@@ -12,7 +12,7 @@ pub trait Pod {
 pub trait PodOps: Pod {
     fn bitlen(&self) -> BigSize;
     fn bits(&self) -> BigSize;
-    fn pod_eq(&self, other: &Pod) -> bool;
+    fn pod_eq(&self, other: &PodOps) -> bool;
     fn min_limbs(&self) -> BigSize;
     fn pod_cmp(&self, rhs: &PodOps) -> Ordering;
     fn pod_ge(&self, rhs: &PodOps) -> bool;
@@ -38,7 +38,7 @@ impl<T> PodOps for T where T: Pod {
         }
         return b;
     }
-    fn pod_eq(&self, other: &Pod) -> bool {
+    fn pod_eq(&self, other: &PodOps) -> bool {
         if self.limbs() > other.limbs() {
             for i in (0..self.limbs()).rev() {
                 if i < other.limbs() {
