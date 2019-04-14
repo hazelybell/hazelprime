@@ -6,11 +6,12 @@ pub trait Pod {
     // Anything with limbs
     fn limbs(&self) -> BigSize;
     fn get_limb(&self, i: BigSize) -> Limb;
-    fn min_limbs(&self) -> BigSize;
 }
 
 pub trait PodOps {
     fn bits(&self) -> BigSize;
+    fn pod_eq(&self, other: &Pod) -> bool;
+    fn min_limbs(&self) -> BigSize;
 }
 
 impl<T> PodOps for T where T: Pod {
@@ -29,6 +30,43 @@ impl<T> PodOps for T where T: Pod {
         }
         return b;
     }
+    fn pod_eq(&self, other: &Pod) -> bool {
+        assert_eq!(self.limbs(), other.limbs());
+        for i in (0..self.limbs()).rev() {
+            if self.get_limb(i) != other.get_limb(i) {
+                return false;
+            }
+        }
+        return true;
+    }
+    fn min_limbs(&self) -> BigSize {
+        for i in (0..self.limbs()).rev() {
+            if self.get_limb(i) != 0 {
+                return (i + 1) as BigSize;
+            }
+        }
+        return 0;
+    }
+}
+
+impl Pod for Limb {
+    fn limbs(&self) -> BigSize {
+        return 1;
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
+        if i == 0 {
+            return *self;
+        } else {
+            panic!("Tried to index into a Limb other than index 0")
+        }
+    }
+//     fn min_limbs(&self) -> BigSize {
+//         if *self == 0 {
+//             return 0;
+//         } else {
+//             return 1;
+//         }
+//     }
 }
 
 pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {

@@ -28,9 +28,6 @@ impl Pod for Fermat {
         }
         return l;
     }
-    fn min_limbs(&self) -> BigSize {
-        div_up(self.n+1, LIMB_SIZE)
-    }
 }
 
 pub trait FermatOps {

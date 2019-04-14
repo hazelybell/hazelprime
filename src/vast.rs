@@ -91,15 +91,6 @@ impl<'a, T> Pod for T where T: Avast {
     fn get_limb(&self, i: BigSize) -> Limb {
         self.as_slice()[i as usize]
     }
-    fn min_limbs(&self) -> BigSize {
-        let v = self.as_slice();
-        for i in (0..v.len()).rev() {
-            if v[i] != 0 {
-                return (i + 1) as BigSize;
-            }
-        }
-        return 0;
-    }
 }
 
 pub fn add_assign_pod(dest: &mut VastMut, a: &Pod) {
@@ -162,13 +153,7 @@ impl<'a> AddAssign<Limb> for VastMut<'a> {
 
 impl<'a> PartialEq for Vast<'a> {
     fn eq (&self, other: &Vast) -> bool {
-        assert_eq!(self.v.len(), other.v.len());
-        for i in (0..self.v.len()).rev() {
-            if self.v[i] != other.v[i] {
-                return false;
-            }
-        }
-        return true;
+        self.pod_eq(other)
     }
 }
 impl<'a> Eq for Vast<'a> {}
