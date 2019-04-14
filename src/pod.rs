@@ -3,8 +3,10 @@ use std::cmp::Ordering;
 use crate::limb::{*};
 
 pub trait Pod {
+    // Anything with limbs
     fn limbs(&self) -> BigSize;
     fn get_limb(&self, i: BigSize) -> Limb;
+    fn min_limbs(&self) -> BigSize;
 }
 
 pub fn cmp_pod(lhs: &Pod, rhs: &Pod) -> Ordering {

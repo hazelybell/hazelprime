@@ -65,5 +65,13 @@ impl<'a> Pod for Chopped<'a> {
             return r;
         }
     }
+    fn min_limbs(&self) -> BigSize {
+        for i in (0..self.limbs()).rev() {
+            if self.get_limb(i) != 0 {
+                return (i + 1) as BigSize;
+            }
+        }
+        return 0;
+    }
 }
 

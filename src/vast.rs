@@ -128,6 +128,15 @@ impl<'a, T> Pod for T where T: Avast {
     fn get_limb(&self, i: BigSize) -> Limb {
         self.as_slice()[i as usize]
     }
+    fn min_limbs(&self) -> BigSize {
+        let v = self.as_slice();
+        for i in (0..v.len()).rev() {
+            if v[i] != 0 {
+                return (i + 1) as BigSize;
+            }
+        }
+        return 0;
+    }
 }
 
 pub fn add_assign_pod(dest: &mut VastMut, a: &Pod) {
