@@ -19,13 +19,24 @@ pub struct Big {
     v: Box<[Limb]>
 }
 
+impl Pod for Big {
+    fn limbs(&self) -> BigSize {
+        self.v.len() as BigSize 
+    }
+    fn get_limb(&self, i: BigSize) -> Limb { 
+        self.v[i as usize] 
+    }
+}
+
+impl PodMut for Big {
+    fn set_limb(&mut self, i: BigSize, l: Limb) {
+        self.v[i as usize] = l;
+    }
+}
+
 impl Big {
     pub fn length(&self) -> BigSize { self.v.len() as BigSize }
     pub fn least_sig(&self) -> Limb { self.v[0] }
-    pub fn zero(&mut self) { for i in 0..self.v.len() { self.v[i] = 0 } }
-    pub fn bits(&self) -> BigSize {
-        Vast::from(self).bits()
-    }
     pub fn bitlen(&self) -> BigSize {
         (self.v.len() as BigSize) * LIMB_SIZE
     }
@@ -160,24 +171,7 @@ impl PartialOrd<Limb> for Big {
 
 impl fmt::UpperHex for Big {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut z = true;
-        let mut r = Ok(());
-        for i in (0..self.v.len()).rev() {
-            if z {
-                if self.v[i] == 0 && i > 0 {
-                } else {
-                    z = false;
-                    r = write!(f, "{:X}", self.v[i]);
-                }
-            } else {
-                r = write!(f, "{:016X}", self.v[i]);
-            }
-            match r {
-                Ok(_) => {},
-                Err(_) => {return r;}
-            }
-        }
-        return r;
+        write!(f, "{}", self.to_hex())
     }
 }
 

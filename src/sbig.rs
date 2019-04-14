@@ -6,6 +6,7 @@ use std::ops::Add;
 use std::ops::Sub;
 
 use crate::limb::{*};
+use crate::pod::{*};
 use crate::svast::{*};
 use crate::big::{*};
 
@@ -178,18 +179,6 @@ impl Add<&Big> for &SBig {
         return SBig { v: v, negative: negative };
     }
 }
-
-// impl SubAssign<&SBig> for SBig {
-//     fn sub_assign(&mut self, a: &SBig) {
-//         if (!self.negative) && (!a.negative) {
-//             if (self.v >= a.v) {
-//                 self.v -= a.v;
-//             } else {
-//                 
-//             }
-//         }
-//     }
-// }
 
 impl Mul<&Big> for &SBig {
     type Output = SBig;

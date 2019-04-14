@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::Write;
 
 use crate::limb::{*};
 
@@ -13,6 +14,7 @@ pub trait PodOps: Pod {
     fn pod_eq(&self, other: &Pod) -> bool;
     fn min_limbs(&self) -> BigSize;
     fn pod_cmp(&self, rhs: &Pod) -> Ordering;
+    fn to_hex(&self) -> String;
 }
 
 impl<T> PodOps for T where T: Pod {
@@ -101,6 +103,22 @@ impl<T> PodOps for T where T: Pod {
             }
         }
         return Ordering::Equal;
+    }
+    fn to_hex(&self) -> String {
+        let mut z = true;
+        let mut s = String::new();
+        for i in (0..self.limbs()).rev() {
+            if z {
+                if self.get_limb(i) == 0 && i > 0 {
+                } else {
+                    z = false;
+                    write!(s, "{:X}", self.get_limb(i)).unwrap();
+                }
+            } else {
+                write!(s, "{:016X}", self.get_limb(i)).unwrap();
+            }
+        }
+        return s;
     }
 }
 
@@ -257,6 +275,9 @@ impl<T> PodMutOps for T where T: PodMut {
             assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
             p.set_limb(a_sz+j, carry as Limb);
         }
+    }
+    fn from_hex(self, src: &Str) {
+        
     }
 }
 

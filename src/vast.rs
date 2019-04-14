@@ -135,12 +135,7 @@ impl<'a> PartialOrd for Vast<'a> {
 
 impl<'a> PartialEq<Limb> for Vast<'a> {
     fn eq (&self, other: &Limb) -> bool {
-        for i in 1..self.v.len() {
-            if self.v[i] != 0 {
-                return false;
-            }
-        }
-        return self.v[0] == *other;
+        self.pod_eq(other)
     }
 }
 impl<'a> PartialEq<Limb> for VastMut<'a> {
@@ -155,34 +150,7 @@ pub trait VastMutOps {
 
 impl<'a> VastMutOps for VastMut<'a> {
     fn assign_mul(self, a: Vast, b: Vast) {
-        let mut p = self;
-        let a_sz = a.min_limbs();
-        let b_sz = b.min_limbs();
-        let p_sz = Vast::from(&p).limbs();
-        p.zero();
-        assert!(p_sz >= a_sz + b_sz);
-        for j in 0..b_sz {
-            let mut carry : Limb2 = 0;
-            for i in 0..a_sz {
-    //             println!("i: {} j: {}, i+j: {}", i, j, i + j);
-                let mut old = p[i + j] as Limb2;
-    //             println!("old: {:X} carry: {:X}", old, carry);
-                old += carry;
-    //             println!("a[i]: {:X} b[j]: {:X}", a[i], b[j]);
-                let x = (a[i] as Limb2) * (b[j] as Limb2);
-                let new = old + x;
-    //             println!("x: {:X} new: {:X}", x, new);
-                if new < x || new < old {
-                    panic!("Wrapped!");
-                }
-                carry = new >> LIMB_SHIFT;
-                p[i + j] = (new & LIMB_MASK) as Limb;
-            }
-    //         println!("Final carry: {:X}", carry);
-            // we don't have anywhere left to put the final carry :(
-            assert_eq!(carry & 0xFFFFFFFFFFFFFFFF0000000000000000u128, 0);
-            p[a_sz+j] = carry as Limb;
-        }
+        self.pod_assign_mul(&a, &b);
     }
 }
 
