@@ -22,31 +22,8 @@ pub struct Vast<'a> {
 impl<'a> Vast<'a> {
 }
 
-pub trait AvastOps {
-    fn bits(&self) -> BigSize;
-}
-
 pub trait Avast {
     fn as_slice(&self) -> &[Limb];
-}
-
-impl<'a, T> AvastOps for T where T: Avast {
-    fn bits(&self) -> BigSize {
-        let v = self.as_slice();
-        let mut b : BigSize = (v.len() as BigSize) * (LIMB_SHIFT as BigSize);
-        for i in (0..v.len()).rev() {
-            let l = v[i];
-            for j in (0..LIMB_SHIFT).rev() {
-                let m = 1u64 << j;
-                if (l & m) == 0 {
-                    b -= 1;
-                } else {
-                    return b;
-                }
-            }
-        }
-        return b;
-    }
 }
 
 impl<'a> Avast for Vast<'a> {
