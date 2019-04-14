@@ -12,11 +12,11 @@ use crate::pod::{*};
 use crate::big::Big;
 
 pub struct VastMut<'a> {
-    v: &'a mut[Limb]
+    pub v: &'a mut[Limb]
 }
 
 pub struct Vast<'a> {
-    v: &'a[Limb]
+    pub v: &'a[Limb]
 }
 
 impl<'a> Vast<'a> {
@@ -67,6 +67,11 @@ impl<'a> From<&'a mut Big> for VastMut<'a> {
     }
 }
 
+impl<'a> Clone for Vast<'a> {
+    fn clone(&self) -> Self {
+        Vast {v: self.v}
+    }
+}
 
 impl<'a> Index<BigSize> for Vast<'a> {
     type Output = Limb;

@@ -1,6 +1,8 @@
 use crate::limb::{*};
 use crate::big::{*};
 use crate::sbig::{*};
+// use crate::vast::{*};
+// use crate::fermat::{*};
 
 pub fn fermat(n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);

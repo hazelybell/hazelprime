@@ -43,6 +43,7 @@ impl<'a> From<VastMut<'a>> for SVastMut<'a> {
     }
 }
 
+
 impl<'a> Index<BigSize> for SVast<'a> {
     type Output = Limb;
     fn index(&self, i: BigSize) -> &Limb {

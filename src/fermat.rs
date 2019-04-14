@@ -42,15 +42,15 @@ impl Pod for Fermat {
 
 pub trait FermatOps {
 //     fn add_fermat(&mut self, n: BigSize);
-    fn mod_fermat(self, f: Fermat, temp: VastMut);
+    fn assign_mod_fermat(self, src: &Vast, f: Fermat);
 }
 
 impl<'a> FermatOps for VastMut<'a> {
-    fn mod_fermat(self, f: Fermat, mut temp: VastMut) {
-        temp.zero();
+    fn assign_mod_fermat(mut self, src: &Vast, f: Fermat) {
+        self.zero();
         let sz = f.limbs();
-        let mut mod_f = SVastMut::from(temp);
-        let src_bits = self.bits();
+        let mut mod_f = SVastMut::from(self);
+        let src_bits = src.bits();
         let iters = div_up(src_bits, f.n);
         for i in 0..iters {
             let chunk: BigSize;
@@ -62,7 +62,7 @@ impl<'a> FermatOps for VastMut<'a> {
             if chunk == 0 {
                 break;
             }
-            let piece = Chopped::chop(Vast::from(&self), f.n*i, chunk);
+            let piece = Chopped::chop(src.clone(), f.n*i, chunk);
             if i % 2 == 0 {
                 mod_f.pod_add_assign(&piece);
             } else {
@@ -82,7 +82,6 @@ impl<'a> FermatOps for VastMut<'a> {
                 }
             }
         }
-        panic!("TODO: implement")
     }
 }
 
