@@ -161,14 +161,16 @@ macro_rules! int_pod {
             }
             fn get_limb(&self, i: BigSize) -> Limb {
                 // FIXME: this is backwards for u128
-                (*self >> (i * (mem::size_of::<Limb>() * 8) as BigSize))
+                (*self >> (
+                        (self.limbs() - i)
+                        * (mem::size_of::<Limb>() * 8) as BigSize))
                     as Limb
             }
         }
     )+}
 }
 
-int_pod! { u8 i8 u16 i16 u32 i32 u64 i64 }
+int_pod! { u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 }
 
 macro_rules! pod_eq {
     (lifetime $l: lifetime; $($P:ty;)+) => {$(
