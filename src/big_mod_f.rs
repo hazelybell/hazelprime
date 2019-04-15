@@ -5,6 +5,7 @@ use crate::big::{*};
 use crate::sbig::{*};
 use crate::vast::{*};
 use crate::fermat::{*};
+use crate::pod::{*};
 
 pub fn fermat(n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
@@ -17,8 +18,14 @@ pub fn fermat(n : BigSize) -> Big {
 pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
     let mut plus = Big::new(sz);
+    let mut plus2 = Big::new(sz);
     let v = VastMut::from(&mut plus);
+    let v2 = VastMut::from(&mut plus2);
     Fermat::mod_fermat(v, &Vast::from(x), Fermat::new(n));
+    Fermat::mod_fermat2(v2, &Vast::from(x), Fermat::new(n));
+    if !plus.pod_eq(&plus2) {
+        panic!("Two ways two different results")
+    }
     return plus;
 }
 
@@ -149,6 +156,13 @@ mod tests {
         let r = mod_fermat(&a, 136);
         println!("{:?}", r);
         assert_eq!(r, 8);
+    }
+    #[test]
+    fn mod_fermat_5() {
+        let a = Big::from_hex("70000000000000E000006FFFFFFFFF2000800000000000010000007FFFFFFFFF0");
+        let r = mod_fermat(&a, 136);
+        println!("{:?}", r);
+        assert_eq!(r.hex_str(), "100000000000002000000FFFFFFFFFE");
     }
     #[test]
     fn mul_mod_fermat_3() {

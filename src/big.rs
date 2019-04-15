@@ -374,19 +374,15 @@ mod tests {
     }
     #[test]
     fn slice_bits_1() {
-        let mut a = Big::new(3);
-        a[0] = 0x8899AABBCCDDEEFFu64;
-        a[1] = 0x0011223344556677u64;
-        a[2] = 0x0123456789ABCDEFu64;
+        let a = Big::from_hex("8123456789ABCDEF00112233445566778899AABBCCDDEEFF");
         let b = a.slice_bits(64, 64);
         assert_eq!(b[0], 0x0011223344556677u64);
         assert_eq!(b.length(), 1);
         let b = a.slice_bits(64, 128);
-        assert_eq!(b[0], 0x0011223344556677u64);
-        assert_eq!(b[1], 0x0123456789ABCDEFu64);
+        assert_eq!(b.to_hex(), "8123456789ABCDEF0011223344556677");
         assert_eq!(b.length(), 2);
         let b = a.slice_bits(32, 64);
-        assert_eq!(b[0], 0x445566778899AABBu64);
+        assert_eq!(b.to_hex(), "445566778899AABB");
         let b = a.slice_bits(32, 128);
         assert_eq!(b[0], 0x445566778899AABBu64);
         assert_eq!(b[1], 0x89ABCDEF00112233u64);
@@ -410,6 +406,12 @@ mod tests {
         a[0] = 0x100000000;
         let b = a.slice_bits(32, 32);
         assert_eq!(b[0], 0x0000000000000001u64);
+    }
+    #[test]
+    fn slice_bits_4() {
+        let a = Big::from_hex("4213D45F73B243B68546D5A3716796C4004B84606D1682968773BEAB03EF51D0E0");
+        let b = a.slice_bits(200, 63);
+        assert_eq!(b.to_hex(), "4213D45F73B243B6");
     }
     #[test]
     fn decrease_big_() {
@@ -456,5 +458,16 @@ mod tests {
     fn from_hex_() {
         let a = Big::from_hex("810E1609");
         assert_eq!(a[0], 0x810E1609);
+    }
+    #[test]
+    fn bits_() {
+        let a = Big::from_hex("3");
+        assert_eq!(a.bits(), 2);
+        let a = Big::from_hex("FFFFFFFF");
+        assert_eq!(a.bits(), 32);
+        let a = Big::from_hex("FFFFFFFFFFFFFFFF");
+        assert_eq!(a.bits(), 64);
+        let a = Big::from_hex("1FFFFFFFFFFFFFFFF");
+        assert_eq!(a.bits(), 65);
     }
 }
