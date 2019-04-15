@@ -30,6 +30,11 @@ impl Pod for Big {
     }
 }
 
+pod_eq! {
+    lifetime 'a;
+    Big;
+}
+
 impl PodMut for Big {
     fn set_limb(&mut self, i: BigSize, l: Limb) {
         self.v[i as usize] = l;
@@ -116,22 +121,9 @@ impl Clone for Big {
     }
 }
 
-impl PartialEq for Big {
-    fn eq (&self, other: &Big) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl Eq for Big {}
-
 impl PartialEq<Limb> for &Big {
     fn eq (&self, other: &Limb) -> bool {
         self.pod_eq(other)
-    }
-}
-
-impl PartialEq<Limb> for Big {
-    fn eq (&self, other: &Limb) -> bool {
-        self == *other
     }
 }
 

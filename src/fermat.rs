@@ -82,6 +82,11 @@ impl Pod for Fermat {
     }
 }
 
+pod_eq! {
+    lifetime 'a;
+    Fermat;
+}
+
 // pub trait FermatOps {
 // //     fn add_fermat(&mut self, n: BigSize);
 //     fn mod_fermat(dest: VastMut<'a>, src: &Vast, f: Fermat) -> VastMut<'a>;

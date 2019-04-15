@@ -66,3 +66,9 @@ impl<'a> Pod for Chopped<'a> {
     }
 }
 
+
+pod_eq! {
+    lifetime 'a;
+    Chopped<'a>;
+}
+
