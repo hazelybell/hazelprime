@@ -160,7 +160,7 @@ macro_rules! int_pod {
                     as BigSize
             }
             fn get_limb(&self, i: BigSize) -> Limb {
-                // FIXME: this is backwards for u128
+                // TODO: test this
                 (*self >> (
                         (self.limbs() - i)
                         * (mem::size_of::<Limb>() * 8) as BigSize))
