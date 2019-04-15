@@ -336,7 +336,7 @@ mod tests {
         assert!(divides(16, 16));
     }
     #[test]
-    fn ss_simple_get_size_() {
+    fn ss_simple_get_size_1() {
         let r = ss_simple_get_size(150000);
         println!("{:?}", r);
 //         assert!(false)
@@ -345,7 +345,7 @@ mod tests {
     fn ss_simple_get_size_2() {
         let r = ss_simple_get_size(120);
         println!("{:?}", r);
-        assert!(false);
+//         assert!(false);
     }
     #[test]
     fn div_up_() {
