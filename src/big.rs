@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -152,19 +154,19 @@ impl PartialOrd<Limb> for Big {
 
 
 impl fmt::UpperHex for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
 
 impl fmt::Display for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         return fmt::UpperHex::fmt(self, f);
     }
 }
 
 impl fmt::Debug for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         let mut r : fmt::Result;
         r = write!(f, "Big {:016X}", self.v[self.v.len()-1]);
         match r {

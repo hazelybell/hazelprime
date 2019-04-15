@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![warn(rust_2018_idioms)]
 
 use std::ops::Deref;
 use std::ops::Index;
@@ -103,7 +104,7 @@ impl<'a> PodMut for VastMut<'a> {
 }
 
 impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
-    fn add_assign(&mut self, a: Vast) {
+    fn add_assign(&mut self, a: Vast<'a>) {
         self.pod_add_assign(&a);
     }
 }
@@ -115,25 +116,25 @@ impl<'a> AddAssign<Limb> for VastMut<'a> {
 }
 
 impl<'a> PartialEq for Vast<'a> {
-    fn eq (&self, other: &Vast) -> bool {
+    fn eq (&self, other: &Vast<'a>) -> bool {
         self.pod_eq(other)
     }
 }
 impl<'a> Eq for Vast<'a> {}
 
 impl<'a> PartialEq for VastMut<'a> {
-    fn eq (&self, other: &VastMut) -> bool {
+    fn eq (&self, other: &VastMut<'a>) -> bool {
         Vast::from(self).eq(&Vast::from(other))
     }
 }
 
 impl<'a> Ord for Vast<'a> {
-    fn cmp(&self, other: &Vast) -> Ordering {
+    fn cmp(&self, other: &Vast<'a>) -> Ordering {
         self.pod_cmp(other)
     }
 }
 impl<'a> PartialOrd for Vast<'a> {
-    fn partial_cmp(&self, other: &Vast) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Vast<'a>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -149,19 +150,19 @@ impl<'a> PartialEq<Limb> for VastMut<'a> {
     }
 }
 
-pub trait VastMutOps {
-    fn assign_mul(&mut self, a: Vast, b: Vast);
+pub trait VastMutOps<'a> {
+    fn assign_mul(&mut self, a: Vast<'a>, b: Vast<'a>);
 }
 
-impl<'a> VastMutOps for VastMut<'a> {
-    fn assign_mul(&mut self, a: Vast, b: Vast) {
+impl<'a> VastMutOps<'a> for VastMut<'a> {
+    fn assign_mul(&mut self, a: Vast<'a>, b: Vast<'a>) {
         self.pod_assign_mul(&a, &b);
     }
 }
 
 
 impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
-    fn sub_assign(&mut self, a: Vast) {
+    fn sub_assign(&mut self, a: Vast<'a>) {
         self.pod_sub_assign(&a);
     }
 }

@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use crate::proth::Proth;
 use nom::{*};
 use nom::types::CompleteStr;

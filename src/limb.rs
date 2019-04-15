@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use std::fmt;
 use std::cmp::Ordering;
 use std::ops::Add;
@@ -46,7 +48,7 @@ impl PartialEq for SLimb {
 impl Eq for SLimb {}
 
 impl fmt::Debug for SLimb {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         if self.negative {
             write!(f, "SLimb {{-{}}}", self.v)
         } else {
