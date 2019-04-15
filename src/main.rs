@@ -5,6 +5,7 @@ use proth::{Proth};
 mod proth_gmp;
 
 mod limb;
+#[macro_use]
 mod pod;
 mod big;
 mod vast;

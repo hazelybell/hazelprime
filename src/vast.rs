@@ -115,19 +115,6 @@ impl<'a> AddAssign<Limb> for VastMut<'a> {
     }
 }
 
-impl<'a> PartialEq for Vast<'a> {
-    fn eq (&self, other: &Vast<'a>) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl<'a> Eq for Vast<'a> {}
-
-impl<'a> PartialEq for VastMut<'a> {
-    fn eq (&self, other: &VastMut<'a>) -> bool {
-        Vast::from(self).eq(&Vast::from(other))
-    }
-}
-
 impl<'a> Ord for Vast<'a> {
     fn cmp(&self, other: &Vast<'a>) -> Ordering {
         self.pod_cmp(other)
@@ -136,17 +123,6 @@ impl<'a> Ord for Vast<'a> {
 impl<'a> PartialOrd for Vast<'a> {
     fn partial_cmp(&self, other: &Vast<'a>) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl<'a> PartialEq<Limb> for Vast<'a> {
-    fn eq (&self, other: &Limb) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl<'a> PartialEq<Limb> for VastMut<'a> {
-    fn eq (&self, other: &Limb) -> bool {
-        Vast::from(self).eq(other)
     }
 }
 
@@ -167,6 +143,11 @@ impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
     }
 }
 
+pod_eq! {
+    lifetime 'a;
+    Vast<'a>;
+    VastMut<'a>;
+}
 
 // **************************************************************************
 // * tests                                                                  *

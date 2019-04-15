@@ -162,7 +162,7 @@ macro_rules! int_pod {
             fn get_limb(&self, i: BigSize) -> Limb {
                 // TODO: test this
                 (*self >> (
-                        (self.limbs() - i)
+                        i
                         * (mem::size_of::<Limb>() * 8) as BigSize))
                     as Limb
             }
