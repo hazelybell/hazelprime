@@ -123,7 +123,7 @@ impl<'a> SVastMut<'a> {
 //         self.v.zero();
 //         self.negative = false;
 //     }
-    pub fn pod_cmp(&self, other: &dyn PodOps) -> Ordering {
+    pub fn pod_cmp(&self, other: &impl PodOps) -> Ordering {
         if self.negative {
             if self.v.pod_eq(&0) {
                 if other.pod_eq(&0) {
@@ -138,7 +138,7 @@ impl<'a> SVastMut<'a> {
             self.v.pod_cmp(other)
         }
     }
-    pub fn pod_add_assign(&mut self, a: &dyn PodOps) {
+    pub fn pod_add_assign(&mut self, a: &impl PodOps) {
         let negative: bool;
         if !self.negative {
             negative = false;
@@ -156,7 +156,7 @@ impl<'a> SVastMut<'a> {
         self.negative = negative;
     }
 
-    pub fn pod_sub_assign(&mut self, a: &dyn PodOps) {
+    pub fn pod_sub_assign(&mut self, a: &impl PodOps) {
         let negative: bool;
         if self.negative {
             negative = true;
