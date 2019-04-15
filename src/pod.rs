@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 use std::fmt::Write;
+use std::mem;
 
 use crate::limb::{*};
 
@@ -153,8 +154,13 @@ impl<T> PodOps for T where T: Pod {
 macro_rules! int_pod {
     ($($i:ty)+) => {$(
         impl Pod for $i {
-            fn limbs(&self) -> BigSize { 1 }
-            fn get_limb(&self, _i: BigSize) -> Limb { *self as Limb }
+            fn limbs(&self) -> BigSize {
+                (mem::size_of::<$i>() / mem::size_of::<Limb>()).max(1) as BigSize
+            }
+            fn get_limb(&self, i: BigSize) -> Limb {
+                // FIXME: this is backwards for u128
+                (*self >> (i * (mem::size_of::<Limb>() * 8) as BigSize)) as Limb
+            }
         }
     )+}
 }
