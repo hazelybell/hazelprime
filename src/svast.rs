@@ -117,10 +117,10 @@ impl<'a> PartialOrd for SVast<'a> {
 }
 
 impl<'a> SVastMut<'a> {
-    pub fn zero(&mut self) {
-        self.v.zero();
-        self.negative = false;
-    }
+//     pub fn zero(&mut self) {
+//         self.v.zero();
+//         self.negative = false;
+//     }
     pub fn pod_cmp(&self, other: &PodOps) -> Ordering {
         if self.negative {
             if self.v.pod_eq(&0) {
@@ -170,6 +170,14 @@ impl<'a> SVastMut<'a> {
             }
         }
         self.negative = negative;
+    }
+    
+    pub fn from_vastmut(x: VastMut) -> SVastMut {
+        SVastMut {v: x, negative: false}
+    }
+    pub fn into_vastmut(self) -> VastMut<'a> {
+        assert!(!self.negative || self.v.pod_eq(&0));
+        return self.v;
     }
 }
 

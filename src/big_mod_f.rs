@@ -2,7 +2,6 @@ use crate::limb::{*};
 use crate::big::{*};
 use crate::sbig::{*};
 use crate::vast::{*};
-use crate::svast::{*};
 use crate::fermat::{*};
 
 pub fn fermat(n : BigSize) -> Big {
@@ -16,8 +15,10 @@ pub fn fermat(n : BigSize) -> Big {
 pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
     let mut plus = Big::new(sz);
-    let mut sv = SVastMut{v: VastMut{v: plus.as_mut_slice()}, negative: false};
-    sv.assign_mod_fermat(&Vast::from(x), Fermat::new(n));
+//     let mut sv = SVastMut{v: VastMut{v: plus.as_mut_slice()}, negative: false};
+//     sv.assign_mod_fermat(&Vast::from(x), Fermat::new(n));
+    let v = VastMut::from(&mut plus);
+    Fermat::mod_fermat(v, &Vast::from(x), Fermat::new(n));
     return plus;
 }
 
