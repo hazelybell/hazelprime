@@ -155,11 +155,14 @@ macro_rules! int_pod {
     ($($i:ty)+) => {$(
         impl Pod for $i {
             fn limbs(&self) -> BigSize {
-                (mem::size_of::<$i>() / mem::size_of::<Limb>()).max(1) as BigSize
+                (mem::size_of::<$i>() / mem::size_of::<Limb>())
+                    .max(1)
+                    as BigSize
             }
             fn get_limb(&self, i: BigSize) -> Limb {
                 // FIXME: this is backwards for u128
-                (*self >> (i * (mem::size_of::<Limb>() * 8) as BigSize)) as Limb
+                (*self >> (i * (mem::size_of::<Limb>() * 8) as BigSize))
+                    as Limb
             }
         }
     )+}
@@ -167,6 +170,16 @@ macro_rules! int_pod {
 
 int_pod! { u8 i8 u16 i16 u32 i32 u64 i64 }
 
+macro_rules! pod_eq {
+    (lifetime $l: lifetime; $($P:ty;)+) => {$(
+        impl<$l, P: Pod> PartialEq<P> for $P {
+            fn eq(&self, other: &P) -> bool {
+                self.pod_eq(other)
+            }
+        }
+        impl<$l> Eq for $P {}
+    )+}
+}
 
 // Mutable stuff **********************************************************
 
