@@ -81,14 +81,6 @@ impl Pod for Fermat {
     }
 }
 
-// pub trait FermatOps {
-// //     fn add_fermat(&mut self, n: BigSize);
-//     fn mod_fermat(dest: VastMut<'a>, src: &Vast, f: Fermat) -> VastMut<'a>;
-// }
-
-// impl<'a> FermatOps for SVastMut<'a> {
-// }
-
 // **************************************************************************
 // * tests                                                                  *
 // **************************************************************************
