@@ -16,10 +16,10 @@ mod ss_simple;
 mod ss_recursive;
 mod chopped;
 
-extern crate nom;
+
 mod parser;
 
-extern crate clap; 
+ 
 use clap::{Arg, App};
 
 fn main() {

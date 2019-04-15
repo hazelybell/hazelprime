@@ -6,36 +6,36 @@ use nom::types::CompleteStr;
 use std::str::FromStr;
 use std::num::ParseIntError;
 
-fn u32_from_cstr(input: CompleteStr) -> Result<u32, ParseIntError> {
+fn u32_from_cstr(input: CompleteStr<'_>) -> Result<u32, ParseIntError> {
     u32::from_str(input.as_ref())
 }
 
-named!(uint32<CompleteStr, u32>,
+named!(uint32<CompleteStr<'_>, u32>,
     map_res!(digit, u32_from_cstr)
 );
 
-named!(times<CompleteStr, CompleteStr>,
+named!(times<CompleteStr<'_>, CompleteStr<'_>>,
     alt!(tag!("*") | tag!("x") | tag!("."))
 );
 
-named!(two<CompleteStr, CompleteStr>,
+named!(two<CompleteStr<'_>, CompleteStr<'_>>,
     tag!("2")
 );
 
-named!(to_the<CompleteStr, CompleteStr>,
+named!(to_the<CompleteStr<'_>, CompleteStr<'_>>,
     alt!( tag!("^") | tag!("e") )
 );
 
-named!(plus<CompleteStr, CompleteStr>,
+named!(plus<CompleteStr<'_>, CompleteStr<'_>>,
     tag!("+")
 );
 
-named!(one<CompleteStr, CompleteStr>,
+named!(one<CompleteStr<'_>, CompleteStr<'_>>,
     tag!("1")
 );
 
 
-named!(parse_proth<CompleteStr, Proth>,
+named!(parse_proth<CompleteStr<'_>, Proth>,
     do_parse!(
         t: uint32 >>
         times >>

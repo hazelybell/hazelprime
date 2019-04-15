@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn create() {
         let mut a = Big::new(2);
-        let mut b: VastMut = VastMut::from(&mut a);
+        let mut b: VastMut<'_> = VastMut::from(&mut a);
         assert_eq!(b[0], 0);
         assert_eq!(b[1], 0);
         b[0] = 2;
