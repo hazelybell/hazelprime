@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::cmp::Ordering;
@@ -66,7 +68,7 @@ impl<'a> IndexMut<BigSize> for SVastMut<'a> {
 }
 
 impl<'a> PartialEq for SVast<'a> {
-    fn eq(&self, other: &SVast) -> bool {
+    fn eq(&self, other: &SVast<'_>) -> bool {
         if self.v == 0 {
             return other.v == 0;
         } else {
@@ -77,7 +79,7 @@ impl<'a> PartialEq for SVast<'a> {
 impl<'a> Eq for SVast<'a> {}
 
 impl<'a> Ord for SVast<'a> {
-    fn cmp(&self, other: &SVast) -> Ordering {
+    fn cmp(&self, other: &SVast<'_>) -> Ordering {
         if self.v == 0 {
             if other.v == 0 {
                 return Ordering::Equal;
@@ -111,7 +113,7 @@ impl<'a> Ord for SVast<'a> {
     }
 }
 impl<'a> PartialOrd for SVast<'a> {
-    fn partial_cmp(&self, other: &SVast) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &SVast<'_>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -121,7 +123,7 @@ impl<'a> SVastMut<'a> {
 //         self.v.zero();
 //         self.negative = false;
 //     }
-    pub fn pod_cmp(&self, other: &PodOps) -> Ordering {
+    pub fn pod_cmp(&self, other: &impl PodOps) -> Ordering {
         if self.negative {
             if self.v.pod_eq(&0) {
                 if other.pod_eq(&0) {
@@ -136,7 +138,7 @@ impl<'a> SVastMut<'a> {
             self.v.pod_cmp(other)
         }
     }
-    pub fn pod_add_assign(&mut self, a: &PodOps) {
+    pub fn pod_add_assign(&mut self, a: &impl PodOps) {
         let negative: bool;
         if !self.negative {
             negative = false;
@@ -154,7 +156,7 @@ impl<'a> SVastMut<'a> {
         self.negative = negative;
     }
 
-    pub fn pod_sub_assign(&mut self, a: &PodOps) {
+    pub fn pod_sub_assign(&mut self, a: &impl PodOps) {
         let negative: bool;
         if self.negative {
             negative = true;
@@ -172,7 +174,7 @@ impl<'a> SVastMut<'a> {
         self.negative = negative;
     }
     
-    pub fn from_vastmut(x: VastMut) -> SVastMut {
+    pub fn from_vastmut(x: VastMut<'_>) -> SVastMut<'_> {
         SVastMut {v: x, negative: false}
     }
     pub fn into_vastmut(self) -> VastMut<'a> {
@@ -182,7 +184,7 @@ impl<'a> SVastMut<'a> {
 }
 
 impl<'a> fmt::Display for SVastMut<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.negative {
             write!(f, "-{}", self.v.to_hex())
         } else {

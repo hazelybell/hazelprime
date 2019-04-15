@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};
@@ -62,5 +64,11 @@ impl<'a> Pod for Chopped<'a> {
             return r;
         }
     }
+}
+
+
+pod_eq! {
+    lifetime 'a;
+    Chopped<'a>;
 }
 

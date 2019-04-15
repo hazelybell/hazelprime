@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![warn(rust_2018_idioms)]
 
 use std::ops::Deref;
 use std::ops::Index;
@@ -103,7 +104,7 @@ impl<'a> PodMut for VastMut<'a> {
 }
 
 impl<'a> AddAssign<Vast<'a>> for VastMut<'a> {
-    fn add_assign(&mut self, a: Vast) {
+    fn add_assign(&mut self, a: Vast<'a>) {
         self.pod_add_assign(&a);
     }
 }
@@ -114,58 +115,39 @@ impl<'a> AddAssign<Limb> for VastMut<'a> {
     }
 }
 
-impl<'a> PartialEq for Vast<'a> {
-    fn eq (&self, other: &Vast) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl<'a> Eq for Vast<'a> {}
-
-impl<'a> PartialEq for VastMut<'a> {
-    fn eq (&self, other: &VastMut) -> bool {
-        Vast::from(self).eq(&Vast::from(other))
-    }
-}
-
 impl<'a> Ord for Vast<'a> {
-    fn cmp(&self, other: &Vast) -> Ordering {
+    fn cmp(&self, other: &Vast<'a>) -> Ordering {
         self.pod_cmp(other)
     }
 }
 impl<'a> PartialOrd for Vast<'a> {
-    fn partial_cmp(&self, other: &Vast) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Vast<'a>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> PartialEq<Limb> for Vast<'a> {
-    fn eq (&self, other: &Limb) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl<'a> PartialEq<Limb> for VastMut<'a> {
-    fn eq (&self, other: &Limb) -> bool {
-        Vast::from(self).eq(other)
-    }
+pub trait VastMutOps<'a> {
+    fn assign_mul(&mut self, a: Vast<'a>, b: Vast<'a>);
 }
 
-pub trait VastMutOps {
-    fn assign_mul(&mut self, a: Vast, b: Vast);
-}
-
-impl<'a> VastMutOps for VastMut<'a> {
-    fn assign_mul(&mut self, a: Vast, b: Vast) {
+impl<'a> VastMutOps<'a> for VastMut<'a> {
+    fn assign_mul(&mut self, a: Vast<'a>, b: Vast<'a>) {
         self.pod_assign_mul(&a, &b);
     }
 }
 
 
 impl<'a> SubAssign<Vast<'a>> for VastMut<'a> {
-    fn sub_assign(&mut self, a: Vast) {
+    fn sub_assign(&mut self, a: Vast<'a>) {
         self.pod_sub_assign(&a);
     }
 }
 
+pod_eq! {
+    lifetime 'a;
+    Vast<'a>;
+    VastMut<'a>;
+}
 
 // **************************************************************************
 // * tests                                                                  *
@@ -177,7 +159,7 @@ mod tests {
     #[test]
     fn create() {
         let mut a = Big::new(2);
-        let mut b: VastMut = VastMut::from(&mut a);
+        let mut b: VastMut<'_> = VastMut::from(&mut a);
         assert_eq!(b[0], 0);
         assert_eq!(b[1], 0);
         b[0] = 2;

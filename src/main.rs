@@ -1,8 +1,11 @@
+#![warn(rust_2018_idioms)]
+
 mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
 mod limb;
+#[macro_use]
 mod pod;
 mod big;
 mod vast;
@@ -14,10 +17,10 @@ mod ss_simple;
 mod ss_recursive;
 mod chopped;
 
-extern crate nom;
+
 mod parser;
 
-extern crate clap; 
+ 
 use clap::{Arg, App};
 
 fn main() {

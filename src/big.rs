@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use std::vec::Vec;
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -26,6 +28,11 @@ impl Pod for Big {
     fn get_limb(&self, i: BigSize) -> Limb { 
         self.v[i as usize] 
     }
+}
+
+pod_eq! {
+    lifetime 'a;
+    Big;
 }
 
 impl PodMut for Big {
@@ -114,22 +121,9 @@ impl Clone for Big {
     }
 }
 
-impl PartialEq for Big {
-    fn eq (&self, other: &Big) -> bool {
-        self.pod_eq(other)
-    }
-}
-impl Eq for Big {}
-
 impl PartialEq<Limb> for &Big {
     fn eq (&self, other: &Limb) -> bool {
         self.pod_eq(other)
-    }
-}
-
-impl PartialEq<Limb> for Big {
-    fn eq (&self, other: &Limb) -> bool {
-        self == *other
     }
 }
 
@@ -152,19 +146,19 @@ impl PartialOrd<Limb> for Big {
 
 
 impl fmt::UpperHex for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
 
 impl fmt::Display for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         return fmt::UpperHex::fmt(self, f);
     }
 }
 
 impl fmt::Debug for Big {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
         let mut r : fmt::Result;
         r = write!(f, "Big {:016X}", self.v[self.v.len()-1]);
         match r {

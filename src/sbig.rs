@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::cmp::Ordering;

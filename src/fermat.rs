@@ -1,3 +1,4 @@
+#![warn(rust_2018_idioms)]
 #![allow(unused)]
 
 use std::cmp::Ordering;
@@ -17,7 +18,7 @@ impl Fermat {
     pub fn new(n: BigSize) -> Fermat {
         Fermat {n: n}
     }
-    pub fn mod_fermat<'a>(mut dest: VastMut<'a>, src: &Vast, f: Fermat) -> VastMut<'a> {
+    pub fn mod_fermat<'a>(mut dest: VastMut<'a>, src: &Vast<'_>, f: Fermat) -> VastMut<'a> {
         dest.zero();
         let sz = f.limbs();
         let mut mod_f = SVastMut::from_vastmut(dest);
@@ -79,6 +80,11 @@ impl Pod for Fermat {
         }
         return l;
     }
+}
+
+pod_eq! {
+    lifetime 'a;
+    Fermat;
 }
 
 // **************************************************************************

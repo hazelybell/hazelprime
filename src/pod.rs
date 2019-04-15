@@ -1,5 +1,8 @@
+#![warn(rust_2018_idioms)]
+
 use std::cmp::Ordering;
 use std::fmt::Write;
+use std::mem;
 
 use crate::limb::{*};
 
@@ -12,10 +15,10 @@ pub trait Pod {
 pub trait PodOps: Pod {
     fn bitlen(&self) -> BigSize;
     fn bits(&self) -> BigSize;
-    fn pod_eq(&self, other: &PodOps) -> bool;
+    fn pod_eq(&self, other: &impl PodOps) -> bool;
     fn min_limbs(&self) -> BigSize;
-    fn pod_cmp(&self, rhs: &PodOps) -> Ordering;
-    fn pod_ge(&self, rhs: &PodOps) -> bool;
+    fn pod_cmp(&self, rhs: &impl PodOps) -> Ordering;
+    fn pod_ge(&self, rhs: &impl PodOps) -> bool;
     fn to_hex(&self) -> String;
 }
 
@@ -38,7 +41,7 @@ impl<T> PodOps for T where T: Pod {
         }
         return b;
     }
-    fn pod_eq(&self, other: &PodOps) -> bool {
+    fn pod_eq(&self, other: &impl PodOps) -> bool {
         if self.limbs() > other.limbs() {
             for i in (0..self.limbs()).rev() {
                 if i < other.limbs() {
@@ -74,7 +77,7 @@ impl<T> PodOps for T where T: Pod {
         }
         return 0;
     }
-    fn pod_cmp(&self, rhs: &PodOps) -> Ordering {
+    fn pod_cmp(&self, rhs: &impl PodOps) -> Ordering {
         let lhs = self;
         if lhs.limbs() > rhs.limbs() {
             for i in (0..lhs.limbs()).rev() {
@@ -109,7 +112,7 @@ impl<T> PodOps for T where T: Pod {
         }
         return Ordering::Equal;
     }
-    fn pod_ge(&self, rhs: &PodOps) -> bool {
+    fn pod_ge(&self, rhs: &impl PodOps) -> bool {
         let c = self.pod_cmp(rhs);
         if c == Ordering::Less {
             return false;
@@ -135,17 +138,49 @@ impl<T> PodOps for T where T: Pod {
     }
 }
 
-impl Pod for Limb {
-    fn limbs(&self) -> BigSize {
-        return 1;
-    }
-    fn get_limb(&self, i: BigSize) -> Limb {
-        if i == 0 {
-            return *self;
-        } else {
-            panic!("Tried to index into a Limb other than index 0")
+// impl Pod for Limb {
+//     fn limbs(&self) -> BigSize {
+//         return 1;
+//     }
+//     fn get_limb(&self, i: BigSize) -> Limb {
+//         if i == 0 {
+//             return *self;
+//         } else {
+//             panic!("Tried to index into a Limb other than index 0")
+//         }
+//     }
+// }
+
+macro_rules! int_pod {
+    ($($i:ty)+) => {$(
+        impl Pod for $i {
+            fn limbs(&self) -> BigSize {
+                (mem::size_of::<$i>() / mem::size_of::<Limb>())
+                    .max(1)
+                    as BigSize
+            }
+            fn get_limb(&self, i: BigSize) -> Limb {
+                // TODO: test this
+                (*self >> (
+                        i
+                        * (mem::size_of::<Limb>() * 8) as BigSize))
+                    as Limb
+            }
         }
-    }
+    )+}
+}
+
+int_pod! { u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 }
+
+macro_rules! pod_eq {
+    (lifetime $l: lifetime; $($P:ty;)+) => {$(
+        impl<$l, P: Pod> PartialEq<P> for $P {
+            fn eq(&self, other: &P) -> bool {
+                self.pod_eq(other)
+            }
+        }
+        impl<$l> Eq for $P {}
+    )+}
 }
 
 // Mutable stuff **********************************************************
@@ -158,11 +193,11 @@ pub trait PodMutOps: PodMut + PodOps {
     fn zero(&mut self);
     fn pod_shl_assign(&mut self, n: BigSize);
     fn pod_shr_assign(&mut self, n: BigSize);
-    fn pod_add_assign(&mut self, a: &PodOps);
-    fn pod_sub_assign(&mut self, a: &PodOps);
-    fn pod_backwards_sub_assign(&mut self, a: &PodOps);
-    fn pod_assign_mul(&mut self, a: &PodOps, b: &PodOps);
-    fn pod_assign_div_qr(&mut self, r: &mut PodMutOps, n: &PodOps, d: &PodOps);
+    fn pod_add_assign(&mut self, a: &impl PodOps);
+    fn pod_sub_assign(&mut self, a: &impl PodOps);
+    fn pod_backwards_sub_assign(&mut self, a: &impl PodOps);
+    fn pod_assign_mul(&mut self, a: &impl PodOps, b: &impl PodOps);
+    fn pod_assign_div_qr(&mut self, r: &mut impl PodMutOps, n: &impl PodOps, d: &impl PodOps);
     fn pod_assign_hex(&mut self, src: &str);
 }
 
@@ -225,7 +260,7 @@ impl<T> PodMutOps for T where T: PodMut {
             self.set_limb(i, 0); // zero the most significant bits
         }
     }
-    fn pod_add_assign(&mut self, a: &PodOps) {
+    fn pod_add_assign(&mut self, a: &impl PodOps) {
         let dest = self;
         let mut carry : Limb = 0;
         let sz = dest.limbs();
@@ -257,7 +292,7 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast overflow in add_assign(Vast)!");
         }
     }
-    fn pod_sub_assign(&mut self, a: &PodOps) {
+    fn pod_sub_assign(&mut self, a: &impl PodOps) {
         let dest = self;
         let mut borrow : Limb = 0;
         let sz = dest.limbs();
@@ -291,7 +326,7 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast underflow in sub_assign(Vast)");
         }
     }
-    fn pod_backwards_sub_assign(&mut self, a: &PodOps) {
+    fn pod_backwards_sub_assign(&mut self, a: &impl PodOps) {
         let dest = self;
         let mut borrow : Limb = 0;
         let sz = dest.limbs();
@@ -326,7 +361,7 @@ impl<T> PodMutOps for T where T: PodMut {
             panic!("Vast underflow in sub_assign(Vast)");
         }
     }
-    fn pod_assign_mul(&mut self, a: &PodOps, b: &PodOps) {
+    fn pod_assign_mul(&mut self, a: &impl PodOps, b: &impl PodOps) {
         let p = self;
         let a_sz = a.min_limbs();
         let b_sz = b.min_limbs();
@@ -356,7 +391,7 @@ impl<T> PodMutOps for T where T: PodMut {
             p.set_limb(a_sz+j, carry as Limb);
         }
     }
-    fn pod_assign_div_qr(&mut self, r: &mut PodMutOps, n: &PodOps, d: &PodOps) {
+    fn pod_assign_div_qr(&mut self, r: &mut impl PodMutOps, n: &impl PodOps, d: &impl PodOps) {
         let q = self;
         if d.pod_eq(&0) {
             panic!("Trying to divide by zero-valued `PodOps`!");
