@@ -137,18 +137,30 @@ impl<T> PodOps for T where T: Pod {
     }
 }
 
-impl Pod for Limb {
-    fn limbs(&self) -> BigSize {
-        return 1;
-    }
-    fn get_limb(&self, i: BigSize) -> Limb {
-        if i == 0 {
-            return *self;
-        } else {
-            panic!("Tried to index into a Limb other than index 0")
+// impl Pod for Limb {
+//     fn limbs(&self) -> BigSize {
+//         return 1;
+//     }
+//     fn get_limb(&self, i: BigSize) -> Limb {
+//         if i == 0 {
+//             return *self;
+//         } else {
+//             panic!("Tried to index into a Limb other than index 0")
+//         }
+//     }
+// }
+
+macro_rules! int_pod {
+    ($($i:ty)+) => {$(
+        impl Pod for $i {
+            fn limbs(&self) -> BigSize { 1 }
+            fn get_limb(&self, _i: BigSize) -> Limb { *self as Limb }
         }
-    }
+    )+}
 }
+
+int_pod! { u8 i8 u16 i16 u32 i32 u64 i64 }
+
 
 // Mutable stuff **********************************************************
 
