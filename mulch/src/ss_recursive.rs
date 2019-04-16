@@ -13,8 +13,21 @@ use crate::fermat::{*};
 use crate::vast::{*};
 use crate::pod::{*};
 
-trait Multiplier {
+struct Plan {
+    required_sz: BigSize,
+    next_bits: BigSize
+}
+
+trait Planned {
+    fn plan(n: BigSize) -> Plan;
+}
+
+trait MultiplierOps {
     fn x<'a>(&mut self, a: &mut VastMut<'a>, b: &Vast<'_>);
+}
+
+trait MultiplierFactory<'a> {
+    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a>;
 }
 
 struct Long<'a> {
@@ -22,10 +35,29 @@ struct Long<'a> {
     work: VastMut<'a>,
 }
 
-impl<'a> Multiplier for Long<'a> {
+impl<'a> Planned for Long<'a> {
+    fn plan(n: BigSize) -> Plan {
+        let sz = div_up(n+1, LIMB_SIZE);
+        return Plan {
+            required_sz: sz,
+            next_bits: 0
+        }
+    }
+}
+
+impl<'a> MultiplierOps for Long<'a> {
     fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
         self.work.pod_assign_mul(a, b);
         Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
+    }
+}
+
+impl<'a> MultiplierFactory<'a> for Long<'a> {
+    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
+        Box::new(Long {
+            f: Fermat::new(n),
+            work: VastMut::from(big_work),
+        })
     }
 }
 
@@ -34,34 +66,50 @@ struct Long2<'a> {
     work: VastMut<'a>,
 }
 
-impl<'a> Multiplier for Long2<'a> {
+impl<'a> Planned for Long2<'a> {
+    fn plan(n: BigSize) -> Plan {
+        let sz = div_up(n+1, LIMB_SIZE);
+        return Plan {
+            required_sz: sz,
+            next_bits: 0
+        }
+    }
+}
+
+impl<'a> MultiplierOps for Long2<'a> {
     fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
         self.work.pod_assign_mul(a, b);
         Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
     }
 }
 
-fn setup_long(n: BigSize, big_work: &mut Big) -> Long {
-    Long {
+impl<'a> MultiplierFactory<'a> for Long2<'a> {
+    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
+        Box::new(Long2 {
             f: Fermat::new(n),
             work: VastMut::from(big_work),
-        }
+        })
+    }
 }
 
-fn setup_long2(n: BigSize, big_work: &mut Big) -> Long2 {
-    Long2 {
-            f: Fermat::new(n),
-            work: VastMut::from(big_work),
-        }
-}
-
-fn setup_long12<'a>(n: BigSize, big_work: &'a mut Big) -> Box<dyn Multiplier + 'a> {
+fn setup_long12<'a>(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
     if (n % 2) == 0 {
-        let mut l1 = setup_long(n, big_work);
-        return Box::new(l1);
+        Long::setup(n, big_work)
     } else {
-        let mut l2 = setup_long2(n, big_work);
-        return Box::new(l2);
+        Long2::setup(n, big_work)
+    }
+}
+
+struct SSR<'a> {
+    f: Fermat,
+    k: BigSize,
+    n: BigSize,
+    work: VastMut<'a>
+}
+
+impl<'a> MultiplierOps for SSR<'a> {
+    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
+        panic!("unimplemented");
     }
 }
 
@@ -73,9 +121,9 @@ pub fn play(a: &mut VastMut, b: &Vast) {
     l.x(a, b);
 }
 
-pub fn pick_Nkn(p_bits: BigSize) -> Nkn {
+pub fn pick_Nkn(n: BigSize) -> Nkn {
     // find a suitable N, k and n
-    let N_min = p_bits + 1;
+    let N_min = n + 1;
     let N_max = N_min * 2; // I have no clue what to set this to :(
     let k_max: BigSize = 16;
     let k_min: BigSize = 1;
@@ -86,7 +134,7 @@ pub fn pick_Nkn(p_bits: BigSize) -> Nkn {
         println!("Trying N={}", N);
         for k in k_min..(k_max+1) {
             let twok = 1 << k;
-            if (twok > p_bits) {
+            if (twok > n) {
                 break;
             }
             if (!divides(twok, N)) {
@@ -128,9 +176,9 @@ pub fn pick_Nkn(p_bits: BigSize) -> Nkn {
     return best;
 }
 
-// pub fn make_plan(p_bits: BigSize) -> Vec<Step> {
+// pub fn make_plan(n: BigSize) -> Vec<Step> {
 //     let mut plan: Vec<Step> = Vec::new();
-//     let mut c_bits = p_bits;
+//     let mut c_bits = n;
 //     while c_bits >= 32768 {
 //         println!("bits: {}", c_bits);
 //         let nkn = pick_Nkn(c_bits);
