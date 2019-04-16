@@ -14,11 +14,12 @@ use crate::vast::{*};
 use crate::pod::{*};
 
 struct Plan {
-    required_sz: BigSize,
+    required_sz: Vec<BigSize>,
     next_bits: BigSize
 }
 
-trait Planned {
+trait Planner {
+    fn get_n(p_bits: BigSize) -> BigSize;
     fn plan(n: BigSize) -> Plan;
 }
 
@@ -27,7 +28,7 @@ trait MultiplierOps {
 }
 
 trait MultiplierFactory<'a> {
-    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a>;
+    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) -> Box<dyn MultiplierOps + 'a>;
 }
 
 struct Long<'a> {
@@ -35,13 +36,17 @@ struct Long<'a> {
     work: VastMut<'a>,
 }
 
-impl<'a> Planned for Long<'a> {
+impl<'a> Planner for Long<'a> {
+    fn get_n(p_bits: BigSize) -> BigSize {
+        p_bits
+    }
     fn plan(n: BigSize) -> Plan {
         let sz = div_up(n+1, LIMB_SIZE);
+        let required: Vec<BigSize> = vec![sz];
         return Plan {
-            required_sz: sz,
+            required_sz: required,
             next_bits: 0
-        }
+        };
     }
 }
 
@@ -53,58 +58,65 @@ impl<'a> MultiplierOps for Long<'a> {
 }
 
 impl<'a> MultiplierFactory<'a> for Long<'a> {
-    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
+    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) -> Box<dyn MultiplierOps + 'a> {
         Box::new(Long {
             f: Fermat::new(n),
-            work: VastMut::from(big_work),
+            work: VastMut::from(&mut workspace[0]),
         })
     }
 }
 
-struct Long2<'a> {
-    f: Fermat,
-    work: VastMut<'a>,
-}
-
-impl<'a> Planned for Long2<'a> {
-    fn plan(n: BigSize) -> Plan {
-        let sz = div_up(n+1, LIMB_SIZE);
-        return Plan {
-            required_sz: sz,
-            next_bits: 0
-        }
-    }
-}
-
-impl<'a> MultiplierOps for Long2<'a> {
-    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
-        self.work.pod_assign_mul(a, b);
-        Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
-    }
-}
-
-impl<'a> MultiplierFactory<'a> for Long2<'a> {
-    fn setup(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
-        Box::new(Long2 {
-            f: Fermat::new(n),
-            work: VastMut::from(big_work),
-        })
-    }
-}
-
-fn setup_long12<'a>(n: BigSize, big_work: &'a mut Big) -> Box<dyn MultiplierOps + 'a> {
-    if (n % 2) == 0 {
-        Long::setup(n, big_work)
+pub fn fit_in_power_of_two(x: BigSize) -> BigSize {
+    let lz = x.leading_zeros();
+    let fz = 64 - lz; // first zero counting from the right
+    let r: BigSize = 1 << (fz-1);
+//     println!("x: {} lz: {} fz: {} r: {}", x, lz, fz, r);
+    if x == r {
+        return r; // already is a power of two
     } else {
-        Long2::setup(n, big_work)
+        return r << 1; // next power of two
     }
+    return r as BigSize;
 }
 
 struct SSR<'a> {
     f: Fermat,
     k: BigSize,
     n: BigSize,
+//     x: Box<dyn MultiplierOps + 'a>,
     work: VastMut<'a>
+}
+
+impl<'a> Planner for SSR<'a> {
+    fn get_n(p_bits: BigSize) -> BigSize {
+        fit_in_power_of_two(p_bits)
+    }
+    fn plan(n: BigSize) -> Plan {
+        let nkn = pick_Nkn(n);
+        assert_eq!(nkn.N, n);
+        let sz = div_up(n+1, LIMB_SIZE);
+        let mut required: Vec<BigSize> = Vec::new();
+        required.push(sz);
+        return Plan {
+            required_sz: required,
+            next_bits: nkn.n
+        }
+    }
+}
+
+impl<'a> MultiplierFactory<'a> for SSR<'a> {
+    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) 
+        -> Box<dyn MultiplierOps + 'a> {
+        let nkn = pick_Nkn(n);
+        assert_eq!(nkn.N, n);
+        let ssr = SSR {
+            f: Fermat::new(n),
+            k: nkn.k,
+            n: nkn.n,
+            work: VastMut::from(&mut workspace[0])
+        };
+        return Box::new(ssr);
+    }
 }
 
 impl<'a> MultiplierOps for SSR<'a> {
@@ -114,10 +126,14 @@ impl<'a> MultiplierOps for SSR<'a> {
 }
 
 pub fn play(a: &mut VastMut, b: &Vast) {
-    let n = a.bits() + b.bits();
-    let sz = div_up(n+1, LIMB_SIZE);
-    let mut big_work = Big::new(sz);
-    let mut l = setup_long12(n, &mut big_work);
+    let p_bits = a.bits() + b.bits();
+    let n = Long::get_n(p_bits);
+    let plan = Long::plan(n);
+    let mut workspace: Vec<Big> = Vec::new();
+    for i in 0..plan.required_sz.len() {
+        workspace.push(Big::new(plan.required_sz[i]));
+    }
+    let mut l = Long::setup(n, &mut workspace);
     l.x(a, b);
 }
 
@@ -200,6 +216,13 @@ mod tests {
     fn pick_Nkn_1() {
         let r = pick_Nkn(3442990);
         println!("{:?}", r);
+    }
+    #[test]
+    fn fit_in_power_of_two_() {
+        let r = fit_in_power_of_two(512);
+        assert_eq!(r, 512);
+        let r = fit_in_power_of_two(513);
+        assert_eq!(r, 1024);
     }
 //     #[test]
 //     fn make_plan_1() {
