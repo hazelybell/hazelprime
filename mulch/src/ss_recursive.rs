@@ -139,7 +139,7 @@ impl<'a> MultiplierOps for SSR<'a> {
     }
 }
 
-pub fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
+fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
     if bits > 32768 {
         return Box::new(SSRPlanner {});
     } else {
@@ -149,6 +149,7 @@ pub fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
 
 pub fn play(a: &mut VastMut, b: &Vast) {
     let p_bits = a.bits() + b.bits();
+    let mut workspaces: Vec<Vec<Big>> = Vec::new();
     let mut planners: Vec<Box<dyn Planner>> = Vec::new();
     planners.push(pick_multiplier(p_bits));
     let n = planners[0].get_n(p_bits);
@@ -163,7 +164,6 @@ pub fn play(a: &mut VastMut, b: &Vast) {
         c_plan = &plans[planners.len()-1];
     }
     
-    let mut workspaces: Vec<Vec<Big>> = Vec::new();
     for pi in 0..planners.len() {
         let plan = &plans[pi];
         let mut workspace: Vec<Big> = Vec::new();
