@@ -4,23 +4,8 @@ mod proth;
 use proth::{Proth};
 mod proth_gmp;
 
-mod limb;
-#[macro_use]
-mod pod;
-mod big;
-mod vast;
-mod svast;
-mod fermat;
-mod sbig;
-mod big_mod_f;
-mod ss_simple;
-mod ss_recursive;
-mod chopped;
-
-
 mod parser;
 
- 
 use clap::{Arg, App};
 
 fn main() {

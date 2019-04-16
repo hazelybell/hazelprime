@@ -5,6 +5,7 @@ use crate::big::{*};
 use crate::sbig::{*};
 use crate::vast::{*};
 use crate::fermat::{*};
+use crate::pod::{*};
 
 pub fn fermat(n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
@@ -24,9 +25,16 @@ pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
 
 
 pub fn mul_mod_fermat(a : &Big, b : &Big, n : BigSize) -> Big {
-    let p_big = a * b;
-    let p = mod_fermat(&p_big, n);
-    return p;
+    let mut big_work = Big::new(a.min_limbs() + b.min_limbs());
+    let mut big_p = Big::new(div_up(n+1, LIMB_SIZE));
+    Fermat::mul_mod_fermat(
+        VastMut::from(&mut big_p),
+        &Vast::from(a),
+        &Vast::from(b),
+        Fermat::new(n),
+        VastMut::from(&mut big_work)
+    );
+    return big_p;
 }
 
 pub fn inv_mod_fermat(a: &Big, n: BigSize) -> Big {

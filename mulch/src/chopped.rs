@@ -24,7 +24,7 @@ impl<'a> Pod for Chopped<'a> {
         /* I would like to use std::ops::Index but it requires we return
          * a reference and I can't create a limb and then return it as a
          * a reference */
-        println!("i: {}", i);
+//         println!("i: {}", i);
         let sz = div_up(self.length, LIMB_SIZE);
         if i >= sz {
             panic!("Attempted to index past the end of chop: sz is {} but index is {}", sz, i);
