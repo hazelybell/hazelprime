@@ -18,29 +18,33 @@ struct Plan {
     next_bits: BigSize
 }
 
-trait Planner {
-    fn get_n(p_bits: BigSize) -> BigSize;
-    fn plan(n: BigSize) -> Plan;
+trait Planner<'a> {
+    fn get_n(&self, p_bits: BigSize) -> BigSize;
+    fn plan(&self, n: BigSize) -> Plan;
+    fn setup(
+        &self,
+        n: BigSize, 
+        workspace: &'a mut Vec<Big>,
+        next: Option<Box<dyn MultiplierOps + 'a>>
+    ) -> Box<dyn MultiplierOps + 'a>;
 }
 
 trait MultiplierOps {
     fn x<'a>(&mut self, a: &mut VastMut<'a>, b: &Vast<'_>);
 }
 
-trait MultiplierFactory<'a> {
-    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) -> Box<dyn MultiplierOps + 'a>;
-}
+struct LongPlanner {}
 
 struct Long<'a> {
     f: Fermat,
     work: VastMut<'a>,
 }
 
-impl<'a> Planner for Long<'a> {
-    fn get_n(p_bits: BigSize) -> BigSize {
+impl<'a> Planner<'a> for LongPlanner {
+    fn get_n(&self, p_bits: BigSize) -> BigSize {
         p_bits
     }
-    fn plan(n: BigSize) -> Plan {
+    fn plan(&self, n: BigSize) -> Plan {
         let sz = div_up(n+1, LIMB_SIZE);
         let required: Vec<BigSize> = vec![sz];
         return Plan {
@@ -48,21 +52,27 @@ impl<'a> Planner for Long<'a> {
             next_bits: 0
         };
     }
+    fn setup(
+        &self,
+        n: BigSize, 
+        workspace: &'a mut Vec<Big>,
+        next: Option<Box<dyn MultiplierOps + 'a>>
+    ) -> Box<dyn MultiplierOps + 'a> {
+        match next {
+            Some(_v) => panic!("Long multiplier doesn't need a sub multiplier"),
+            None => {}
+        }
+        return Box::new(Long {
+            f: Fermat::new(n),
+            work: VastMut::from(&mut workspace[0]),
+        });
+    }
 }
 
 impl<'a> MultiplierOps for Long<'a> {
     fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
         self.work.pod_assign_mul(a, b);
         Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
-    }
-}
-
-impl<'a> MultiplierFactory<'a> for Long<'a> {
-    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) -> Box<dyn MultiplierOps + 'a> {
-        Box::new(Long {
-            f: Fermat::new(n),
-            work: VastMut::from(&mut workspace[0]),
-        })
     }
 }
 
@@ -79,19 +89,21 @@ pub fn fit_in_power_of_two(x: BigSize) -> BigSize {
     return r as BigSize;
 }
 
+struct SSRPlanner {}
+
 struct SSR<'a> {
     f: Fermat,
     k: BigSize,
     n: BigSize,
-//     x: Box<dyn MultiplierOps + 'a>,
+    x: Box<dyn MultiplierOps + 'a>,
     work: VastMut<'a>
 }
 
-impl<'a> Planner for SSR<'a> {
-    fn get_n(p_bits: BigSize) -> BigSize {
+impl<'a> Planner<'a> for SSRPlanner {
+    fn get_n(&self, p_bits: BigSize) -> BigSize {
         fit_in_power_of_two(p_bits)
     }
-    fn plan(n: BigSize) -> Plan {
+    fn plan(&self, n: BigSize) -> Plan {
         let nkn = pick_Nkn(n);
         assert_eq!(nkn.N, n);
         let sz = div_up(n+1, LIMB_SIZE);
@@ -102,17 +114,19 @@ impl<'a> Planner for SSR<'a> {
             next_bits: nkn.n
         }
     }
-}
-
-impl<'a> MultiplierFactory<'a> for SSR<'a> {
-    fn setup(n: BigSize, workspace: &'a mut Vec<Big>) 
-        -> Box<dyn MultiplierOps + 'a> {
+    fn setup(
+        &self,
+        n: BigSize, 
+        workspace: &'a mut Vec<Big>,
+        next: Option<Box<dyn MultiplierOps + 'a>>
+    ) -> Box<dyn MultiplierOps + 'a> {
         let nkn = pick_Nkn(n);
         assert_eq!(nkn.N, n);
         let ssr = SSR {
             f: Fermat::new(n),
             k: nkn.k,
             n: nkn.n,
+            x: next.unwrap(),
             work: VastMut::from(&mut workspace[0])
         };
         return Box::new(ssr);
@@ -125,15 +139,58 @@ impl<'a> MultiplierOps for SSR<'a> {
     }
 }
 
+pub fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
+    if bits > 32768 {
+        return Box::new(SSRPlanner {});
+    } else {
+        return Box::new(LongPlanner {});
+    }
+}
+
 pub fn play(a: &mut VastMut, b: &Vast) {
     let p_bits = a.bits() + b.bits();
-    let n = Long::get_n(p_bits);
-    let plan = Long::plan(n);
-    let mut workspace: Vec<Big> = Vec::new();
-    for i in 0..plan.required_sz.len() {
-        workspace.push(Big::new(plan.required_sz[i]));
+    let mut planners: Vec<Box<dyn Planner>> = Vec::new();
+    planners.push(pick_multiplier(p_bits));
+    let n = planners[0].get_n(p_bits);
+    
+    let mut plans: Vec<Plan> = Vec::new();
+    plans.push(planners[0].plan(p_bits));
+    
+    let mut c_plan = &plans[0];
+    while c_plan.next_bits > 0 {
+        planners.push(pick_multiplier(c_plan.next_bits));
+        plans.push(planners[planners.len()-1].plan(c_plan.next_bits));
+        c_plan = &plans[planners.len()-1];
     }
-    let mut l = Long::setup(n, &mut workspace);
+    
+    let mut workspaces: Vec<Vec<Big>> = Vec::new();
+    for pi in 0..planners.len() {
+        let plan = &plans[pi];
+        let mut workspace: Vec<Big> = Vec::new();
+        for i in 0..plan.required_sz.len() {
+            workspace.push(Big::new(plan.required_sz[i]));
+        }
+        workspaces.push(workspace);
+    }
+    
+    let mut mults: Vec<Box<dyn MultiplierOps>> = Vec::new();
+    let mut last: Option<Box<dyn MultiplierOps>> = None;
+    let mut pi = planners.len() - 1;
+    for workspace in workspaces.iter_mut().rev() {
+        let planner = &planners[pi];
+        let up_n: BigSize;
+//         let workspace: &mut Vec<Big> = &mut workspaces[pi];
+        if pi == 0 {
+            up_n = n;
+        } else {
+            up_n = plans[pi-1].next_bits;
+        }
+        let mut next = planner.setup(up_n, workspace, last);
+        last = Some(next);
+        pi -= 1;
+        // warning: mults will be backwards from planners, plans, workspaces
+    }
+    let mut l = last.unwrap();
     l.x(a, b);
 }
 
