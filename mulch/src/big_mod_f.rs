@@ -18,8 +18,8 @@ pub fn fermat(n : BigSize) -> Big {
 pub fn mod_fermat(x : &Big, n : BigSize) -> Big {
     let sz = div_up(n+1, LIMB_SIZE);
     let mut plus = Big::new(sz);
-    let v = VastMut::from(&mut plus);
-    Fermat::mod_fermat(v, &Vast::from(x), Fermat::new(n));
+    let mut v = VastMut::from(&mut plus);
+    Fermat::mod_fermat(&mut v, &Vast::from(x), Fermat::new(n));
     return plus;
 }
 
@@ -28,11 +28,11 @@ pub fn mul_mod_fermat(a : &Big, b : &Big, n : BigSize) -> Big {
     let mut big_work = Big::new(a.min_limbs() + b.min_limbs());
     let mut big_p = Big::new(div_up(n+1, LIMB_SIZE));
     Fermat::mul_mod_fermat(
-        VastMut::from(&mut big_p),
+        &mut VastMut::from(&mut big_p),
         &Vast::from(a),
         &Vast::from(b),
         Fermat::new(n),
-        VastMut::from(&mut big_work)
+        &mut VastMut::from(&mut big_work)
     );
     return big_p;
 }

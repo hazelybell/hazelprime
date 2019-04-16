@@ -16,13 +16,13 @@ fn bench_1(bencher: &mut Bencher) {
     let mut big_work = Big::new(div_up(n+1, LIMB_SIZE)*2);
     let b = Vast::from(&big_b);
     let closure = || {
-        let a = VastMut::from(&mut big_a);
-        let work = VastMut::from(&mut big_work);
+        let mut a = VastMut::from(&mut big_a);
+        let mut work = VastMut::from(&mut big_work);
         Fermat::mul_mod_fermat_assign(
-            a,
+            &mut a,
             &b,
             f,
-            work
+            &mut work
         );
     };
     bencher.iter(closure);

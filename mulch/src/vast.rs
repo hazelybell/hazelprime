@@ -50,6 +50,11 @@ impl<'a> From<&'a VastMut<'a>> for Vast<'a> {
     }
 }
 
+impl<'a> From<&'a mut VastMut<'a>> for Vast<'a> {
+    fn from(m: &'a mut VastMut<'a>) -> Vast<'a> {
+        Vast {v:  m.v}
+    }
+}
 impl<'a> From<VastMut<'a>> for Vast<'a> {
     fn from(m: VastMut<'a>) -> Vast<'a> {
         Vast {v:  m.v}
