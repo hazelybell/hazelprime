@@ -18,7 +18,7 @@ use crate::vast::{*};
 use crate::chopped::{*};
 
 pub struct Big {
-    v: Box<[Limb]>
+    pub v: Box<[Limb]>
 }
 
 impl Pod for Big {

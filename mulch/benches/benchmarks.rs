@@ -8,7 +8,7 @@ use mulch::vast::{*};
 use mulch::limb::{*};
 
 #[bench]
-fn bench_1(bencher: &mut Bencher) {
+fn bench_mul_mod_fermat_assign(bencher: &mut Bencher) {
     let n = 136;
     let f = Fermat::new(n);
     let mut big_a = Big::from_hex("9D68E100A50B479104B85497A9BA510639");

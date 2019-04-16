@@ -3,16 +3,74 @@
 #![allow(unused)]
 
 use std::cmp::max;
+use std::rc::Rc;
 
 use crate::limb::{*};
 use crate::big::{*};
 use crate::big_mod_f::{*};
 use crate::ss_simple::{*};
+use crate::fermat::{*};
+use crate::vast::{*};
+use crate::pod::{*};
 
-#[derive(Debug)]
-pub enum Step {
-    SS(Nkn),
-    Long
+trait Multiplier {
+    fn x<'a>(&mut self, a: &mut VastMut<'a>, b: &Vast<'_>);
+}
+
+struct Long<'a> {
+    f: Fermat,
+    work: VastMut<'a>,
+}
+
+impl<'a> Multiplier for Long<'a> {
+    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
+        self.work.pod_assign_mul(a, b);
+        Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
+    }
+}
+
+struct Long2<'a> {
+    f: Fermat,
+    work: VastMut<'a>,
+}
+
+impl<'a> Multiplier for Long2<'a> {
+    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
+        self.work.pod_assign_mul(a, b);
+        Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
+    }
+}
+
+fn setup_long(n: BigSize, big_work: &mut Big) -> Long {
+    Long {
+            f: Fermat::new(n),
+            work: VastMut::from(big_work),
+        }
+}
+
+fn setup_long2(n: BigSize, big_work: &mut Big) -> Long2 {
+    Long2 {
+            f: Fermat::new(n),
+            work: VastMut::from(big_work),
+        }
+}
+
+fn setup_long12<'a>(n: BigSize, big_work: &'a mut Big) -> Box<dyn Multiplier + 'a> {
+    if (n % 2) == 0 {
+        let mut l1 = setup_long(n, big_work);
+        return Box::new(l1);
+    } else {
+        let mut l2 = setup_long2(n, big_work);
+        return Box::new(l2);
+    }
+}
+
+pub fn play(a: &mut VastMut, b: &Vast) {
+    let n = a.bits() + b.bits();
+    let sz = div_up(n+1, LIMB_SIZE);
+    let mut big_work = Big::new(sz);
+    let mut l = setup_long12(n, &mut big_work);
+    l.x(a, b);
 }
 
 pub fn pick_Nkn(p_bits: BigSize) -> Nkn {
@@ -70,40 +128,20 @@ pub fn pick_Nkn(p_bits: BigSize) -> Nkn {
     return best;
 }
 
-pub fn make_plan(p_bits: BigSize) -> Vec<Step> {
-    let mut plan: Vec<Step> = Vec::new();
-    let mut c_bits = p_bits;
-    while c_bits >= 32768 {
-        println!("bits: {}", c_bits);
-        let nkn = pick_Nkn(c_bits);
-        c_bits = nkn.n;
-        plan.push(Step::SS(nkn));
-    }
-    println!("bits: {}", c_bits);
-    plan.push(Step::Long);
-    return plan;
-}
-
-pub struct Space {
-    a: Big,
-    b: Big,
-    p: Big
-}
-
-pub fn make_workspace(plan: Vec<Step>) -> Vec<Space> {
-    let workspace: Vec<Space> = Vec::new();
-    return workspace;
-}
-// 
-// pub fn rec_multiply(a: Big, b: Big) -> Big {
-//     let a_bits = a.bits();
-//     let b_bits = b.bits();
-//     let a_sz = a.length();
-//     let b_sz = b.length();
-//     let p_bits = a_bits + b_bits; // number of bits in the product
-//     let plan = make_plan();
-//     let workspace = make_workspace(plan);
+// pub fn make_plan(p_bits: BigSize) -> Vec<Step> {
+//     let mut plan: Vec<Step> = Vec::new();
+//     let mut c_bits = p_bits;
+//     while c_bits >= 32768 {
+//         println!("bits: {}", c_bits);
+//         let nkn = pick_Nkn(c_bits);
+//         c_bits = nkn.n;
+//         plan.push(Step::SS(nkn));
+//     }
+//     println!("bits: {}", c_bits);
+//     plan.push(Step::Long);
+//     return plan;
 // }
+
 // **************************************************************************
 // * tests                                                                  *
 // **************************************************************************
@@ -115,10 +153,10 @@ mod tests {
         let r = pick_Nkn(3442990);
         println!("{:?}", r);
     }
-    #[test]
-    fn make_plan_1() {
-        let plan = make_plan(3442990);
-        println!("{:?}", plan);
-//         assert!(false);
-    }
+//     #[test]
+//     fn make_plan_1() {
+//         let plan = make_plan(3442990);
+//         println!("{:?}", plan);
+// //         assert!(false);
+//     }
 }

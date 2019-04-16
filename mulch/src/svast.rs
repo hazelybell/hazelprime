@@ -174,13 +174,13 @@ impl<'a> SVastMut<'a> {
         self.negative = negative;
     }
     
-    pub fn from_vastmut(x: VastMut<'_>) -> SVastMut<'_> {
-        SVastMut {v: x, negative: false}
-    }
-    pub fn into_vastmut(self) -> VastMut<'a> {
-        assert!(!self.negative || self.v.pod_eq(&0));
-        return self.v;
-    }
+//     pub fn from_vastmut(x: VastMut<'_>) -> SVastMut<'_> {
+//         SVastMut {v: x, negative: false}
+//     }
+//     pub fn into_vastmut(self) -> VastMut<'a> {
+//         assert!(!self.negative || self.v.pod_eq(&0));
+//         return self.v;
+//     }
 }
 
 impl<'a> fmt::Display for SVastMut<'a> {
