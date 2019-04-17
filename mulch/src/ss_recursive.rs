@@ -30,7 +30,7 @@ trait Planner<'a> {
 }
 
 pub trait MultiplierOps {
-    fn x<'a>(&mut self, a: &mut VastMut<'a>, b: &Vast<'_>);
+    fn x(&mut self, a: &mut VastMut, b: &Vast);
 }
 
 struct LongPlanner {}
@@ -175,7 +175,8 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast<'b>) {
 }
 
 impl<'a> MultiplierOps for SSR<'a> {
-    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast) {
+    fn x(&mut self, a: &mut VastMut, b: &Vast) {
+//         split(&mut self.a_split, &Vast::from(a));
         split(&mut self.b_split, b);
         panic!("unimplemented");
     }
