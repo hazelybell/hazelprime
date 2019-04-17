@@ -176,7 +176,7 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
 
 impl<'a> MultiplierOps for SSR<'a> {
     fn x(&mut self, a: &mut VastMut, b: &Vast) {
-        let a_immut = Vast {v: a.v};
+        let a_immut = Vast::from(&*a);
         split(&mut self.a_split, &a_immut);
         split(&mut self.b_split, b);
         panic!("unimplemented");

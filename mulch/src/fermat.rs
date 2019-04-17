@@ -69,7 +69,7 @@ impl Fermat {
         work: &'a mut VastMut<'a>
     ) {
         work.pod_assign_mul(a, b);
-        Fermat::mod_fermat(dest, &Vast::from(work), f);
+        Fermat::mod_fermat(dest, &Vast::from(&*work), f);
     }
     pub fn mul_mod_fermat_assign<'a>(
         a: &mut VastMut<'a>,
@@ -78,7 +78,7 @@ impl Fermat {
         work: &'a mut VastMut<'a>
     ) {
         work.pod_assign_mul(a, b);
-        Fermat::mod_fermat(a, &Vast::from(work), f);
+        Fermat::mod_fermat(a, &Vast::from(&*work), f);
     }
 }
 
