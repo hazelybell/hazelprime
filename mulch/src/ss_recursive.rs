@@ -29,7 +29,7 @@ trait Planner<'a> {
     ) -> Box<dyn MultiplierOps + 'a>;
 }
 
-trait MultiplierOps {
+pub trait MultiplierOps {
     fn x<'a>(&mut self, a: &mut VastMut<'a>, b: &Vast<'_>);
 }
 
@@ -46,6 +46,7 @@ impl<'a> Planner<'a> for LongPlanner {
     }
     fn plan(&self, n: BigSize) -> Plan {
         let sz = div_up(n+1, LIMB_SIZE);
+        println!("Requesting {} bits", sz * LIMB_SIZE);
         let required: Vec<BigSize> = vec![sz];
         return Plan {
             required_sz: required,
@@ -96,19 +97,30 @@ struct SSR<'a> {
     k: BigSize,
     n: BigSize,
     x: Box<dyn MultiplierOps + 'a>,
-    work: VastMut<'a>
+    a_split: Vec<VastMut<'a>>,
+    b_split: Vec<VastMut<'a>>,
 }
 
 impl<'a> Planner<'a> for SSRPlanner {
     fn get_n(&self, p_bits: BigSize) -> BigSize {
         fit_in_power_of_two(p_bits)
     }
-    fn plan(&self, n: BigSize) -> Plan {
-        let nkn = pick_Nkn(n);
-        assert_eq!(nkn.N, n);
-        let sz = div_up(n+1, LIMB_SIZE);
+    fn plan(&self, N: BigSize) -> Plan {
+        let nkn = pick_Nkn(N);
+        assert_eq!(nkn.N, N);
+        let k = nkn.k;
+        let long_sz = div_up(N+1, LIMB_SIZE);
         let mut required: Vec<BigSize> = Vec::new();
-        required.push(sz);
+        let twok: BigSize = 1 << k;
+        let pieces = twok as usize;
+        assert!(divides(twok, long_sz));
+        let piece_sz = long_sz / twok;
+        for i in 0..pieces { // a_split
+            required.push(piece_sz);
+        }
+        for i in 0..pieces { // b_split
+            required.push(piece_sz);
+        }
         return Plan {
             required_sz: required,
             next_bits: nkn.n
@@ -116,20 +128,49 @@ impl<'a> Planner<'a> for SSRPlanner {
     }
     fn setup(
         &self,
-        n: BigSize, 
+        N: BigSize, 
         workspace: &'a mut Vec<Big>,
         next: Option<Box<dyn MultiplierOps + 'a>>
     ) -> Box<dyn MultiplierOps + 'a> {
-        let nkn = pick_Nkn(n);
-        assert_eq!(nkn.N, n);
+        let nkn = pick_Nkn(N);
+        assert_eq!(nkn.N, N);
+        let k = nkn.k;
+        let twok = 1 << k;
+        let mut worki = workspace.into_iter();
+        let mut a_split: Vec<VastMut<'a>> = Vec::new();
+        for _i in 0..twok {
+            a_split.push(VastMut::from(worki.next().unwrap()));
+        }
+        let mut b_split: Vec<VastMut<'a>> = Vec::new();
+        for _i in 0..twok {
+            b_split.push(VastMut::from(worki.next().unwrap()));
+        }
         let ssr = SSR {
-            f: Fermat::new(n),
+            f: Fermat::new(N),
             k: nkn.k,
             n: nkn.n,
             x: next.unwrap(),
-            work: VastMut::from(&mut workspace[0])
+            a_split: a_split,
+            b_split: b_split
         };
         return Box::new(ssr);
+    }
+}
+
+fn split<'a>(into: &mut Vec<VastMut<'a>>, from: &Vast<'a>) {
+    let long_sz = from.limbs();
+    let piece_sz = into[0].limbs();
+    let number = into.len() as BigSize;
+    assert!(divides(number, long_sz));
+    let limbs_each = long_sz / number;
+    let mut i = 0;
+    for piece in into {
+        let start = i * limbs_each;
+        for j in 0..limbs_each {
+            let src_j = j + start;
+            piece[j] = from[src_j];
+        }
+        i += 1;
     }
 }
 
@@ -147,9 +188,10 @@ fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
     }
 }
 
-pub fn play(a: &mut VastMut, b: &Vast) {
-    let p_bits = a.bits() + b.bits();
-    let mut workspaces: Vec<Vec<Big>> = Vec::new();
+pub fn recursive_setup<'a>(
+    p_bits: BigSize,
+    mut workspaces: &'a mut Vec<Vec<Big>>
+) -> Box<dyn MultiplierOps + 'a> {
     let mut planners: Vec<Box<dyn Planner>> = Vec::new();
     planners.push(pick_multiplier(p_bits));
     let n = planners[0].get_n(p_bits);
@@ -187,11 +229,24 @@ pub fn play(a: &mut VastMut, b: &Vast) {
         }
         let mut next = planner.setup(up_n, workspace, last);
         last = Some(next);
-        pi -= 1;
+        if pi > 0 {
+            pi -= 1;
+        }
         // warning: mults will be backwards from planners, plans, workspaces
     }
     let mut l = last.unwrap();
-    l.x(a, b);
+    return l;
+}
+
+pub fn recursive_multiply(a: &mut VastMut, b: &Vast) {
+    let mut workspaces: Vec<Vec<Big>> = Vec::new();
+    let p_bits = a.bits() + b.bits();
+    println!("p_bits: {}", p_bits);
+    if p_bits > a.limbs() * LIMB_SIZE {
+        panic!("a not big enough to hold result!")
+    }
+    let mut mult = recursive_setup(p_bits, &mut workspaces);
+    mult.x(a, b);
 }
 
 pub fn pick_Nkn(n: BigSize) -> Nkn {
@@ -249,20 +304,6 @@ pub fn pick_Nkn(n: BigSize) -> Nkn {
     return best;
 }
 
-// pub fn make_plan(n: BigSize) -> Vec<Step> {
-//     let mut plan: Vec<Step> = Vec::new();
-//     let mut c_bits = n;
-//     while c_bits >= 32768 {
-//         println!("bits: {}", c_bits);
-//         let nkn = pick_Nkn(c_bits);
-//         c_bits = nkn.n;
-//         plan.push(Step::SS(nkn));
-//     }
-//     println!("bits: {}", c_bits);
-//     plan.push(Step::Long);
-//     return plan;
-// }
-
 // **************************************************************************
 // * tests                                                                  *
 // **************************************************************************
@@ -280,6 +321,69 @@ mod tests {
         assert_eq!(r, 512);
         let r = fit_in_power_of_two(513);
         assert_eq!(r, 1024);
+    }
+    #[test]
+    fn multiply_2048() {
+        let mut ba = Big::from_hex(
+             "B954E7DFEE6CCE82F19BC30B53E6B6E15081CD494DD1652CEA6A30D134316E1\
+             452C5BB2012B0889BB5A148093ED8CA2DDA1FA3E09D4473C6EAA90FC7809247C\
+             FB7FE805D7095BD679653E016B74FFA844E7401BBE68BB7B25754B87F0D07AD0\
+             72DBBEAB6F3E9B7C94ED93B8665FEBEE18091EB2BDFB021A5DA9DDC981F23E12"
+        );
+        let a_sz = ba.limbs()*2;
+        let mut ba = big_extend(ba, a_sz);
+        let bb = Big::from_hex(
+             "45BAA2EE705DDC4BDB71C3B963B612EC2CFE3B14E836C9988D260410DC9CF4C\
+             B11C1E091B2EE874887BFBFBB5FD136859D2E887D96F43D0328C0FF3BAFDF67C\
+             E3C71874F014F0C076109C3112C9C051F88B60F929967758F58E5041728C98B5\
+             0B099D03817A54400BB065726B0D5D8DB328957083535EF65229F3FC0C65F691"
+        );
+        let mut a: VastMut = VastMut::from(&mut ba);
+        let b: Vast = Vast::from(&bb);
+        recursive_multiply(&mut a, &b);
+        assert_eq!(a.to_hex(), 
+              "327B00242CFAEE8DF0C4F7486CADB351CEABFBDCF340A119E34DC3BEFD209D\
+             6408553EA56FEC93DED68F3FFB9BABB60E3E0C03FF652DB955AACE4F05576796\
+             3E8DA37B7C7FD5C35A29AE814656217397F562B3E5527F49DFAC585F32E8B905\
+             ADCB3C58F3C0F4D3511A1E02A357EBE095371FAEC2F1616595CBA68029323FF8\
+             916FB9E7792750B8309B1322E8A1B8038881CE87B99F241A1C475629ACF29077\
+             A8A06FED983FF02114C3E7D57CFF99EAB76323E2B356E24A0CC49618BE216A2A\
+             C97DB6185B92275311C91B2B337B38F6839960047A9971BFE776668CEB0802DC\
+             3E1F7310289C6E4AF589914E6FCAC46673D036908906B308CB301134B6F47432"
+            );
+    }
+    #[test]
+    fn multiply_2048_direct() {
+        let mut ba = Big::from_hex(
+             "B954E7DFEE6CCE82F19BC30B53E6B6E15081CD494DD1652CEA6A30D134316E1\
+             452C5BB2012B0889BB5A148093ED8CA2DDA1FA3E09D4473C6EAA90FC7809247C\
+             FB7FE805D7095BD679653E016B74FFA844E7401BBE68BB7B25754B87F0D07AD0\
+             72DBBEAB6F3E9B7C94ED93B8665FEBEE18091EB2BDFB021A5DA9DDC981F23E12"
+        );
+        let a_sz = ba.limbs()*2;
+        let mut ba = big_extend(ba, a_sz);
+        let bb = Big::from_hex(
+             "45BAA2EE705DDC4BDB71C3B963B612EC2CFE3B14E836C9988D260410DC9CF4C\
+             B11C1E091B2EE874887BFBFBB5FD136859D2E887D96F43D0328C0FF3BAFDF67C\
+             E3C71874F014F0C076109C3112C9C051F88B60F929967758F58E5041728C98B5\
+             0B099D03817A54400BB065726B0D5D8DB328957083535EF65229F3FC0C65F691"
+        );
+        let mut a: VastMut = VastMut::from(&mut ba);
+        let b: Vast = Vast::from(&bb);
+        let p_bits = a.bits() + b.bits();
+        let mut workspaces: Vec<Vec<Big>> = Vec::new();
+        let mut mult = recursive_setup(p_bits, &mut workspaces);
+        mult.x(&mut a, &b);
+        assert_eq!(a.to_hex(), 
+              "327B00242CFAEE8DF0C4F7486CADB351CEABFBDCF340A119E34DC3BEFD209D\
+             6408553EA56FEC93DED68F3FFB9BABB60E3E0C03FF652DB955AACE4F05576796\
+             3E8DA37B7C7FD5C35A29AE814656217397F562B3E5527F49DFAC585F32E8B905\
+             ADCB3C58F3C0F4D3511A1E02A357EBE095371FAEC2F1616595CBA68029323FF8\
+             916FB9E7792750B8309B1322E8A1B8038881CE87B99F241A1C475629ACF29077\
+             A8A06FED983FF02114C3E7D57CFF99EAB76323E2B356E24A0CC49618BE216A2A\
+             C97DB6185B92275311C91B2B337B38F6839960047A9971BFE776668CEB0802DC\
+             3E1F7310289C6E4AF589914E6FCAC46673D036908906B308CB301134B6F47432"
+            );
     }
 //     #[test]
 //     fn make_plan_1() {
