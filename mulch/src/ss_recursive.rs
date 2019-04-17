@@ -157,7 +157,7 @@ impl<'a> Planner<'a> for SSRPlanner {
     }
 }
 
-fn split<'a>(into: &mut Vec<VastMut<'a>>, from: &Vast<'a>) {
+fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast<'b>) {
     let long_sz = from.limbs();
     let piece_sz = into[0].limbs();
     let number = into.len() as BigSize;
@@ -175,7 +175,8 @@ fn split<'a>(into: &mut Vec<VastMut<'a>>, from: &Vast<'a>) {
 }
 
 impl<'a> MultiplierOps for SSR<'a> {
-    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
+    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast) {
+        split(&mut self.b_split, b);
         panic!("unimplemented");
     }
 }
