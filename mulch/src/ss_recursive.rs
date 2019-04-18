@@ -167,6 +167,9 @@ impl SSRPlanner {
             piece_work_sz: piece_work_sz,
         }
     }
+    fn dft_matrix<'a>(&self, D: &mut Vec<VastMut<'a>>) {
+        
+    }
 }
 
 struct SSR<'a> {
@@ -210,6 +213,9 @@ impl<'a> Planner<'a> for SSRPlanner {
             required.push(self.piece_sz);
         }
         required.push(self.piece_work_sz);
+        for i in 0..(self.twok*self.twok) {
+            required.push(self.piece_sz);
+        }
         return Plan {
             required_sz: required,
         }
@@ -220,15 +226,24 @@ impl<'a> Planner<'a> for SSRPlanner {
         next: Option<Box<dyn MultiplierOps + 'a>>
     ) -> Box<dyn MultiplierOps + 'a> {
         let mut worki = workspace.into_iter();
+        
         let mut a_split: Vec<VastMut<'a>> = Vec::new();
         for _i in 0..self.twok {
             a_split.push(VastMut::from(worki.next().unwrap()));
         }
+        
         let mut b_split: Vec<VastMut<'a>> = Vec::new();
         for _i in 0..self.twok {
             b_split.push(VastMut::from(worki.next().unwrap()));
         }
+        
         let piece_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
+        
+        let mut D: Vec<VastMut<'a>> = Vec::new();
+        for _i in 0..(self.twok*self.twok) {
+            D.push(VastMut::from(worki.next().unwrap()));
+        }
+        
         let ssr = SSR {
             params: *self,
             F: Fermat::new(self.N),
@@ -304,6 +319,7 @@ impl<'a> MultiplierOps for SSR<'a> {
             );
         }
         self.print_ab();
+        
         panic!("unimplemented");
     }
 }
