@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 use std::cmp::max;
-use std::rc::Rc;
+use std::f64;
 
 use crate::limb::{*};
 use crate::big::{*};
@@ -15,15 +15,13 @@ use crate::pod::{*};
 
 struct Plan {
     required_sz: Vec<BigSize>,
-    next_n: BigSize
 }
 
 trait Planner<'a> {
-    fn get_n(&self, p_bits: BigSize) -> BigSize;
-    fn plan(&self, n: BigSize) -> Plan;
+    fn next_goal(&self) -> Goal;
+    fn plan(&self) -> Plan;
     fn setup(
         &self,
-        n: BigSize, 
         workspace: &'a mut Vec<Big>,
         next: Option<Box<dyn MultiplierOps + 'a>>
     ) -> Box<dyn MultiplierOps + 'a>;
@@ -33,7 +31,39 @@ pub trait MultiplierOps {
     fn x(&mut self, a: &mut VastMut, b: &Vast);
 }
 
-struct LongPlanner {}
+#[derive(PartialEq,Eq)]
+enum Goal {
+    ModN(BigSize),
+    PBits(BigSize),
+    Done
+}
+
+struct LongPlanner {
+    n: BigSize,
+    p_bits: BigSize
+}
+
+impl LongPlanner {
+    fn new(goal: Goal) -> LongPlanner {
+        match goal {
+            Goal::ModN(n) => {
+                return LongPlanner {
+                    n: n,
+                    p_bits: n*2,
+                };
+            }
+            Goal::PBits(b) => {
+                return LongPlanner {
+                    n: b,
+                    p_bits: b
+                };
+            }
+            Goal::Done => {
+                panic!("Recursion error, planning for done!");
+            }
+        }
+    }
+}
 
 struct Long<'a> {
     f: Fermat,
@@ -41,21 +71,19 @@ struct Long<'a> {
 }
 
 impl<'a> Planner<'a> for LongPlanner {
-    fn get_n(&self, p_bits: BigSize) -> BigSize {
-        p_bits
+    fn next_goal(&self) -> Goal {
+        Goal::Done
     }
-    fn plan(&self, n: BigSize) -> Plan {
-        let sz = div_up(n+1, LIMB_SIZE);
+    fn plan(&self) -> Plan {
+        let sz = div_up(self.n+1, LIMB_SIZE);
         println!("Requesting {} bits", sz * LIMB_SIZE);
         let required: Vec<BigSize> = vec![sz];
         return Plan {
             required_sz: required,
-            next_n: 0
         };
     }
     fn setup(
         &self,
-        n: BigSize, 
         workspace: &'a mut Vec<Big>,
         next: Option<Box<dyn MultiplierOps + 'a>>
     ) -> Box<dyn MultiplierOps + 'a> {
@@ -64,7 +92,7 @@ impl<'a> Planner<'a> for LongPlanner {
             None => {}
         }
         return Box::new(Long {
-            f: Fermat::new(n),
+            f: Fermat::new(self.n),
             work: VastMut::from(&mut workspace[0]),
         });
     }
@@ -90,66 +118,91 @@ pub fn fit_in_power_of_two(x: BigSize) -> BigSize {
     return r as BigSize;
 }
 
-struct SSRPlanner {}
-
-struct SSR<'a> {
-    f: Fermat,
+#[derive(Clone,Copy)]
+struct SSRPlanner {
+    N: BigSize,
     k: BigSize,
     n: BigSize,
+    long_sz: BigSize,
+    longer_sz: BigSize,
+    twok: BigSize,
+    piece_sz: BigSize,
+}
+
+impl SSRPlanner {
+    fn new(goal: Goal) -> SSRPlanner {
+        let nkn: Nkn;
+        match goal {
+            Goal::ModN(n) => {
+                nkn = pick_Nkn(n);
+            }
+            Goal::PBits(b) => {
+                nkn = pick_Nkn(b);
+            }
+            Goal::Done => {
+                panic!("Recursion error, planning for done!");
+            }
+        }
+        let longer_sz = div_up(nkn.N+1, LIMB_SIZE);
+        let long_sz = div_up(nkn.N, LIMB_SIZE);
+        let twok: BigSize = 1 << nkn.k;
+        assert!(divides(twok, long_sz));
+        let piece_sz = long_sz / twok;
+        return SSRPlanner {
+            N: nkn.N,
+            k: nkn.k,
+            n: nkn.n,
+            long_sz: long_sz,
+            longer_sz: longer_sz,
+            twok: twok,
+            piece_sz: piece_sz,
+        }
+    }
+}
+
+struct SSR<'a> {
+    params: SSRPlanner,
+    f: Fermat,
     x: Box<dyn MultiplierOps + 'a>,
     a_split: Vec<VastMut<'a>>,
     b_split: Vec<VastMut<'a>>,
 }
 
 impl<'a> Planner<'a> for SSRPlanner {
-    fn get_n(&self, p_bits: BigSize) -> BigSize {
-        fit_in_power_of_two(p_bits)
+    fn next_goal(&self) -> Goal {
+        Goal::ModN(self.n)
     }
-    fn plan(&self, N: BigSize) -> Plan {
-        let nkn = pick_Nkn(N);
-        assert_eq!(nkn.N, N);
-        let k = nkn.k;
-        let longer_sz = div_up(N+1, LIMB_SIZE);
-        let long_sz = div_up(N, LIMB_SIZE);
+    fn plan(&self) -> Plan {
+        let k = self.k;
+        let N = self.N;
         let mut required: Vec<BigSize> = Vec::new();
-        let twok: BigSize = 1 << k;
-        let pieces = twok as usize;
-        assert!(divides(twok, long_sz));
-        let piece_sz = long_sz / twok;
-        for i in 0..pieces { // a_split
-            required.push(piece_sz);
+        for i in 0..self.twok { // a_split
+            required.push(self.piece_sz);
         }
-        for i in 0..pieces { // b_split
-            required.push(piece_sz);
+        for i in 0..self.twok { // b_split
+            required.push(self.piece_sz);
         }
         return Plan {
             required_sz: required,
-            next_n: nkn.n
         }
     }
     fn setup(
         &self,
-        N: BigSize, 
         workspace: &'a mut Vec<Big>,
         next: Option<Box<dyn MultiplierOps + 'a>>
     ) -> Box<dyn MultiplierOps + 'a> {
-        let nkn = pick_Nkn(N);
-        assert_eq!(nkn.N, N);
-        let k = nkn.k;
-        let twok = 1 << k;
         let mut worki = workspace.into_iter();
         let mut a_split: Vec<VastMut<'a>> = Vec::new();
-        for _i in 0..twok {
+        for _i in 0..self.twok {
             a_split.push(VastMut::from(worki.next().unwrap()));
         }
         let mut b_split: Vec<VastMut<'a>> = Vec::new();
-        for _i in 0..twok {
+        for _i in 0..self.twok {
             b_split.push(VastMut::from(worki.next().unwrap()));
         }
         let ssr = SSR {
-            f: Fermat::new(N),
-            k: nkn.k,
-            n: nkn.n,
+            params: *self,
+            f: Fermat::new(self.N),
             x: next.unwrap(),
             a_split: a_split,
             b_split: b_split
@@ -158,8 +211,12 @@ impl<'a> Planner<'a> for SSRPlanner {
     }
 }
 
-fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
-    let long_sz = from.limbs();
+fn split<'a, 'b>(
+    into: &mut Vec<VastMut<'a>>,
+    from: &Vast,
+    long_sz: BigSize
+) {
+    let from_sz = from.limbs();
     let piece_sz = into[0].limbs();
     let number = into.len() as BigSize;
     assert!(divides(number, long_sz));
@@ -169,7 +226,16 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
         let start = i * limbs_each;
         for j in 0..limbs_each {
             let src_j = j + start;
-            piece[j] = from[src_j];
+            let l: Limb;
+            if src_j < from_sz {
+                l = from[src_j];
+            } else {
+                l = 0;
+            }
+            piece[j] = l;
+        }
+        for j in limbs_each..piece_sz {
+            piece[j] = 0;
         }
         i += 1;
     }
@@ -177,18 +243,24 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
 
 impl<'a> MultiplierOps for SSR<'a> {
     fn x(&mut self, a: &mut VastMut, b: &Vast) {
-        // might need to pad these first
-        split(&mut self.a_split, &Vast::from(&*a));
-        split(&mut self.b_split, b);
+        let long_sz = self.params.long_sz;
+        split(&mut self.a_split, &Vast::from(&*a), long_sz);
+        split(&mut self.b_split, b, long_sz);
         panic!("unimplemented");
     }
 }
 
-fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
+fn pick_multiplier<'a>(goal: Goal) -> Box<dyn Planner<'a>> {
+    let bits: BigSize;
+    match goal {
+        Goal::ModN(n) => { bits = n; }
+        Goal::PBits(b) => { bits = b; }
+        Goal::Done => { panic!("Recursion error, planning for done!"); }
+    }
     if bits > 512 {
-        return Box::new(SSRPlanner {});
+        return Box::new(SSRPlanner::new(goal));
     } else {
-        return Box::new(LongPlanner {});
+        return Box::new(LongPlanner::new(goal));
     }
 }
 
@@ -197,21 +269,16 @@ pub fn recursive_setup<'a>(
     mut workspaces: &'a mut Vec<Vec<Big>>
 ) -> Box<dyn MultiplierOps + 'a> {
     let mut planners: Vec<Box<dyn Planner>> = Vec::new();
-    planners.push(pick_multiplier(p_bits));
-    let n = planners[0].get_n(p_bits);
+    planners.push(pick_multiplier(Goal::PBits(p_bits)));
     
-    let mut plans: Vec<Plan> = Vec::new();
-    plans.push(planners[0].plan(n));
-    
-    let mut c_plan = &plans[0];
-    while c_plan.next_n > 0 {
-        planners.push(pick_multiplier(c_plan.next_n));
-        plans.push(planners[planners.len()-1].plan(c_plan.next_n));
-        c_plan = &plans[planners.len()-1];
+    let mut next_goal = planners[0].next_goal();
+    while next_goal != Goal::Done {
+        planners.push(pick_multiplier(next_goal));
+        next_goal = planners[planners.len()-1].next_goal();
     }
     
-    for pi in 0..planners.len() {
-        let plan = &plans[pi];
+    for planner in (&mut planners) {
+        let plan = planner.plan();
         let mut workspace: Vec<Big> = Vec::new();
         for i in 0..plan.required_sz.len() {
             workspace.push(Big::new(plan.required_sz[i]));
@@ -224,14 +291,7 @@ pub fn recursive_setup<'a>(
     let mut pi = planners.len() - 1;
     for workspace in workspaces.iter_mut().rev() {
         let planner = &planners[pi];
-        let up_n: BigSize;
-//         let workspace: &mut Vec<Big> = &mut workspaces[pi];
-        if pi == 0 {
-            up_n = n;
-        } else {
-            up_n = plans[pi-1].next_n;
-        }
-        let mut next = planner.setup(up_n, workspace, last);
+        let mut next = planner.setup(workspace, last);
         last = Some(next);
         if pi > 0 {
             pi -= 1;
@@ -256,47 +316,35 @@ pub fn recursive_multiply(a: &mut VastMut, b: &Vast) {
 pub struct KN {
     k: BigSize,
     n: BigSize,
-    waste: BigSize
 }
 
-pub fn pick_kn(N: BigSize) -> KN {
-    let k_max: BigSize = 16;
-    let k_min: BigSize = 1;
-    let mut best = KN {k: 0, n: 0, waste: BigSize::max_value()};
-    for k in k_min..(k_max+1) {
-        let twok = 1 << k;
-        if (!divides(twok, N)) {
-            // if this 2^k doesnt divide N then a bigger one wont
-            break;
-        }
-        let n_min = 2 * N / twok + k;
-        let n_max = N/2;
-        println!("    Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
-        let piece_sz = N / twok;
-        println!("    Piece size: {}", piece_sz);
-        if piece_sz % LIMB_SIZE > 0 {
-            break;
-        }
-        let n = div_up(n_min, twok)*twok;
-        if n <= n_max {
-            assert!(divides(twok, n));
-            println!("    Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
-            let next_n = get_next_power_of_two(n);
-            println!("    Next power of two after n: {}", next_n);
-            let waste = (next_n - piece_sz) * twok;
-            println!("    Waste bits: {}", waste);
-            let optimal_twok = (N as f64).sqrt();
-            println!("    Optimal twok={}", optimal_twok);
-            if waste <= best.waste {
-                println!("    Best so far.");
-                best = KN {
-                    k: k,
-                    n: n,
-                    waste: waste
-                };
-            }
-        }
-        println!("");
+pub fn pick_kn(N: BigSize, k: BigSize) -> KN {
+    let mut best = KN {k: 0, n: 0};
+    let twok = 1 << k;
+    if (!divides(twok, N)) {
+        // if this 2^k doesnt divide N then a bigger one wont
+        return best;
+    }
+    let n_min = 2 * N / twok + k;
+    let n_max = N/2;
+    println!("    Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
+    let piece_sz = N / twok;
+    println!("    Piece size: {}", piece_sz);
+    if piece_sz % LIMB_SIZE > 0 {
+        return best;
+    }
+    let n = div_up(n_min, twok)*twok;
+    if n <= n_max {
+        assert!(divides(twok, n));
+        println!("    Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
+        let next_n = get_next_power_of_two(n);
+        println!("    Next power of two after n: {}", next_n);
+        let waste_bits = (next_n - piece_sz) * twok;
+        println!("    Waste bits: {}", waste_bits);
+        return KN {
+            k: k,
+            n: n,
+        };
     }
     return best;
 }
@@ -306,23 +354,30 @@ pub fn pick_Nkn(N_start: BigSize) -> Nkn {
     let N_max = N_start * 2; // I have no clue what to set this to :(
     let mut N = N_start;
     let mut best = Nkn { N: 0, k: 0, n: 0};
-    let mut best_waste = BigSize::max_value();
+    let optimal_twok = (N_start as f64).sqrt();
+    let optimal_k = optimal_twok.log2();
+    let k: BigSize = optimal_k.floor() as BigSize;
+    println!(
+        "Optimal twok={} k={} k={}",
+        optimal_twok, optimal_k, k);
     while N < N_max {
         println!("Trying N={}", N);
-        let kn = pick_kn(N);
-        println!("Best so far: N={} k={} n={} waste={}", N, kn.k, kn.n, kn.waste);
-        if kn.waste < best_waste {
+        let kn = pick_kn(N, k);
+        if kn.n != 0 {
+            println!("Best so far: N={} k={} n={}", N, kn.k, kn.n);
             best = Nkn {
                 N: N,
                 k: kn.k,
                 n: kn.n
-            }
+            };
+            break;
         }
-        N = get_next_power_of_two(N);
+        N = (N / 512 + 1) * 512;
     }
     assert_ne!(best.N, 0);
     assert_ne!(best.k, 0);
     assert_ne!(best.n, 0);
+    println!("Final: N={} k={} n={}", best.N, best.k, best.n);
     return best;
 }
 
@@ -334,7 +389,7 @@ mod tests {
     use crate::ss_recursive::{*};
     #[test]
     fn pick_Nkn_1() {
-        let r = pick_Nkn(400);
+        let r = pick_Nkn(5000000);
         println!("{:?}", r);
     }
     #[test]
