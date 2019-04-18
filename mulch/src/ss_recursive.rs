@@ -15,7 +15,7 @@ use crate::pod::{*};
 
 struct Plan {
     required_sz: Vec<BigSize>,
-    next_bits: BigSize
+    next_n: BigSize
 }
 
 trait Planner<'a> {
@@ -50,7 +50,7 @@ impl<'a> Planner<'a> for LongPlanner {
         let required: Vec<BigSize> = vec![sz];
         return Plan {
             required_sz: required,
-            next_bits: 0
+            next_n: 0
         };
     }
     fn setup(
@@ -109,7 +109,8 @@ impl<'a> Planner<'a> for SSRPlanner {
         let nkn = pick_Nkn(N);
         assert_eq!(nkn.N, N);
         let k = nkn.k;
-        let long_sz = div_up(N+1, LIMB_SIZE);
+        let longer_sz = div_up(N+1, LIMB_SIZE);
+        let long_sz = div_up(N, LIMB_SIZE);
         let mut required: Vec<BigSize> = Vec::new();
         let twok: BigSize = 1 << k;
         let pieces = twok as usize;
@@ -123,7 +124,7 @@ impl<'a> Planner<'a> for SSRPlanner {
         }
         return Plan {
             required_sz: required,
-            next_bits: nkn.n
+            next_n: nkn.n
         }
     }
     fn setup(
@@ -176,6 +177,7 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
 
 impl<'a> MultiplierOps for SSR<'a> {
     fn x(&mut self, a: &mut VastMut, b: &Vast) {
+        // might need to pad these first
         split(&mut self.a_split, &Vast::from(&*a));
         split(&mut self.b_split, b);
         panic!("unimplemented");
@@ -199,12 +201,12 @@ pub fn recursive_setup<'a>(
     let n = planners[0].get_n(p_bits);
     
     let mut plans: Vec<Plan> = Vec::new();
-    plans.push(planners[0].plan(p_bits));
+    plans.push(planners[0].plan(n));
     
     let mut c_plan = &plans[0];
-    while c_plan.next_bits > 0 {
-        planners.push(pick_multiplier(c_plan.next_bits));
-        plans.push(planners[planners.len()-1].plan(c_plan.next_bits));
+    while c_plan.next_n > 0 {
+        planners.push(pick_multiplier(c_plan.next_n));
+        plans.push(planners[planners.len()-1].plan(c_plan.next_n));
         c_plan = &plans[planners.len()-1];
     }
     
@@ -227,7 +229,7 @@ pub fn recursive_setup<'a>(
         if pi == 0 {
             up_n = n;
         } else {
-            up_n = plans[pi-1].next_bits;
+            up_n = plans[pi-1].next_n;
         }
         let mut next = planner.setup(up_n, workspace, last);
         last = Some(next);
@@ -251,58 +253,76 @@ pub fn recursive_multiply(a: &mut VastMut, b: &Vast) {
     mult.x(a, b);
 }
 
-pub fn pick_Nkn(n: BigSize) -> Nkn {
-    // find a suitable N, k and n
-    let N_min = n + 1;
-    let N_max = N_min * 2; // I have no clue what to set this to :(
+pub struct KN {
+    k: BigSize,
+    n: BigSize,
+    waste: BigSize
+}
+
+pub fn pick_kn(N: BigSize) -> KN {
     let k_max: BigSize = 16;
     let k_min: BigSize = 1;
-    let mut N = N_min;
+    let mut best = KN {k: 0, n: 0, waste: BigSize::max_value()};
+    for k in k_min..(k_max+1) {
+        let twok = 1 << k;
+        if (!divides(twok, N)) {
+            // if this 2^k doesnt divide N then a bigger one wont
+            break;
+        }
+        let n_min = 2 * N / twok + k;
+        let n_max = N/2;
+        println!("    Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
+        let piece_sz = N / twok;
+        println!("    Piece size: {}", piece_sz);
+        if piece_sz % LIMB_SIZE > 0 {
+            break;
+        }
+        let n = div_up(n_min, twok)*twok;
+        if n <= n_max {
+            assert!(divides(twok, n));
+            println!("    Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
+            let next_n = get_next_power_of_two(n);
+            println!("    Next power of two after n: {}", next_n);
+            let waste = (next_n - piece_sz) * twok;
+            println!("    Waste bits: {}", waste);
+            let optimal_twok = (N as f64).sqrt();
+            println!("    Optimal twok={}", optimal_twok);
+            if waste <= best.waste {
+                println!("    Best so far.");
+                best = KN {
+                    k: k,
+                    n: n,
+                    waste: waste
+                };
+            }
+        }
+        println!("");
+    }
+    return best;
+}
+
+pub fn pick_Nkn(N_start: BigSize) -> Nkn {
+    // find a suitable N, k and n
+    let N_max = N_start * 2; // I have no clue what to set this to :(
+    let mut N = N_start;
     let mut best = Nkn { N: 0, k: 0, n: 0};
     let mut best_waste = BigSize::max_value();
     while N < N_max {
         println!("Trying N={}", N);
-        for k in k_min..(k_max+1) {
-            let twok = 1 << k;
-            if (twok > n) {
-                break;
+        let kn = pick_kn(N);
+        println!("Best so far: N={} k={} n={} waste={}", N, kn.k, kn.n, kn.waste);
+        if kn.waste < best_waste {
+            best = Nkn {
+                N: N,
+                k: kn.k,
+                n: kn.n
             }
-            if (!divides(twok, N)) {
-                // if this 2^k doesnt divide N then a bigger one wont
-                break;
-            }
-            let n_min = 2 * N / twok + k;
-            let n_max = N/2;
-            println!("Trying k={} twok={} n_min=2N/2^k+k={} n_max={}", k, twok, n_min, n_max);
-            let piece_sz = N / twok;
-            println!("Piece size: {}", piece_sz);
-            if piece_sz % LIMB_SIZE > 0 {
-                break;
-            }
-            let n = div_up(n_min, twok)*twok;
-            if n <= n_max {
-                assert!(divides(twok, n));
-                println!("Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
-                let next_n = get_next_power_of_two(n);
-                println!("Next power of two after n: {}", next_n);
-                let waste = (next_n - piece_sz) * twok;
-                println!("Waste bits: {}", waste);
-                let optimal_twok = (N as f64).sqrt();
-                println!("Optimal twok={}", optimal_twok);
-                if waste <= best_waste {
-                    println!("Best so far.");
-                    best = Nkn {
-                        N: N,
-                        k: k,
-                        n: n
-                    };
-                    best_waste = waste;
-                }
-            }
-            println!("");
         }
         N = get_next_power_of_two(N);
     }
+    assert_ne!(best.N, 0);
+    assert_ne!(best.k, 0);
+    assert_ne!(best.n, 0);
     return best;
 }
 
@@ -314,7 +334,7 @@ mod tests {
     use crate::ss_recursive::{*};
     #[test]
     fn pick_Nkn_1() {
-        let r = pick_Nkn(512);
+        let r = pick_Nkn(400);
         println!("{:?}", r);
     }
     #[test]
