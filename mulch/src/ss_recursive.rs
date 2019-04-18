@@ -71,7 +71,7 @@ impl<'a> Planner<'a> for LongPlanner {
 }
 
 impl<'a> MultiplierOps for Long<'a> {
-    fn x<'b>(&mut self, a: &mut VastMut<'b>, b: &Vast<'_>) {
+    fn x(&mut self, a: &mut VastMut, b: &Vast) {
         self.work.pod_assign_mul(a, b);
         Fermat::mod_fermat(a, &Vast::from(&self.work), self.f);
     }
@@ -176,15 +176,14 @@ fn split<'a, 'b>(into: &mut Vec<VastMut<'a>>, from: &Vast) {
 
 impl<'a> MultiplierOps for SSR<'a> {
     fn x(&mut self, a: &mut VastMut, b: &Vast) {
-        let a_immut = Vast::from(&*a);
-        split(&mut self.a_split, &a_immut);
+        split(&mut self.a_split, &Vast::from(&*a));
         split(&mut self.b_split, b);
         panic!("unimplemented");
     }
 }
 
 fn pick_multiplier<'a>(bits: BigSize) -> Box<dyn Planner<'a>> {
-    if bits > 32768 {
+    if bits > 512 {
         return Box::new(SSRPlanner {});
     } else {
         return Box::new(LongPlanner {});
@@ -315,7 +314,7 @@ mod tests {
     use crate::ss_recursive::{*};
     #[test]
     fn pick_Nkn_1() {
-        let r = pick_Nkn(3442990);
+        let r = pick_Nkn(512);
         println!("{:?}", r);
     }
     #[test]
