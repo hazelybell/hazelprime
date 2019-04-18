@@ -145,36 +145,36 @@ impl PartialOrd<Limb> for Big {
 }
 
 
-impl fmt::UpperHex for Big {
-    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
-        write!(f, "{}", self.to_hex())
-    }
-}
-
-impl fmt::Display for Big {
-    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
-        return fmt::UpperHex::fmt(self, f);
-    }
-}
-
-impl fmt::Debug for Big {
-    fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
-        let mut r : fmt::Result;
-        r = write!(f, "Big {:016X}", self.v[self.v.len()-1]);
-        match r {
-            Ok(_) => {},
-            Err(_) => {return r;}
-        }
-        for i in (0..(self.v.len()-1)).rev() {
-            r = write!(f, ",{:016X}", self.v[i]);
-            match r {
-                Ok(_) => {},
-                Err(_) => {return r;}
-            }
-        }
-        return r;
-    }
-}
+// impl fmt::UpperHex for Big {
+//     fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
+//         write!(f, "{}", self.to_hex())
+//     }
+// }
+// 
+// impl fmt::Display for Big {
+//     fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
+//         return fmt::UpperHex::fmt(self, f);
+//     }
+// }
+// 
+// impl fmt::Debug for Big {
+//     fn fmt<'a>(&self, f: &mut fmt::Formatter<'a>) -> fmt::Result {
+//         let mut r : fmt::Result;
+//         r = write!(f, "Big {:016X}", self.v[self.v.len()-1]);
+//         match r {
+//             Ok(_) => {},
+//             Err(_) => {return r;}
+//         }
+//         for i in (0..(self.v.len()-1)).rev() {
+//             r = write!(f, ",{:016X}", self.v[i]);
+//             match r {
+//                 Ok(_) => {},
+//                 Err(_) => {return r;}
+//             }
+//         }
+//         return r;
+//     }
+// }
 
 impl ShlAssign<BigSize> for Big {
     fn shl_assign(&mut self, n: BigSize) {

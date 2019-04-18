@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use std::cmp::Ordering;
+use std::fmt;
 
 use crate::limb::{*};
 use crate::pod::{*};
@@ -8,7 +9,7 @@ use crate::vast::{*};
 use crate::svast::{*};
 use crate::chopped::{*};
 
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone,Copy)]
 pub struct Fermat {
     pub n: BigSize
 }

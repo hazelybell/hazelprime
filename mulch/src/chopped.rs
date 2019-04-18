@@ -1,5 +1,7 @@
 #![warn(rust_2018_idioms)]
 
+use std::fmt;
+
 use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};

@@ -7,6 +7,7 @@ use std::ops::IndexMut;
 use std::ops::AddAssign;
 use std::cmp::Ordering;
 use std::ops::SubAssign;
+use std::fmt;
 
 use crate::limb::{*};
 use crate::pod::{*};

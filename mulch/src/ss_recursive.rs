@@ -127,6 +127,8 @@ struct SSRPlanner {
     longer_sz: BigSize,
     twok: BigSize,
     piece_sz: BigSize,
+    limbs_each: BigSize,
+    piece_work_sz: BigSize,
 }
 
 impl SSRPlanner {
@@ -143,11 +145,16 @@ impl SSRPlanner {
                 panic!("Recursion error, planning for done!");
             }
         }
+        assert_ne!(nkn.N, 0);
+        assert_ne!(nkn.k, 0);
+        assert_ne!(nkn.n, 0);
         let longer_sz = div_up(nkn.N+1, LIMB_SIZE);
         let long_sz = div_up(nkn.N, LIMB_SIZE);
         let twok: BigSize = 1 << nkn.k;
         assert!(divides(twok, long_sz));
-        let piece_sz = long_sz / twok;
+        let piece_sz = div_up(nkn.n+1, LIMB_SIZE);
+        let limbs_each = long_sz / twok;
+        let piece_work_sz = piece_sz * 2;
         return SSRPlanner {
             N: nkn.N,
             k: nkn.k,
@@ -156,16 +163,20 @@ impl SSRPlanner {
             longer_sz: longer_sz,
             twok: twok,
             piece_sz: piece_sz,
+            limbs_each: limbs_each,
+            piece_work_sz: piece_work_sz,
         }
     }
 }
 
 struct SSR<'a> {
     params: SSRPlanner,
+    F: Fermat,
     f: Fermat,
     x: Box<dyn MultiplierOps + 'a>,
     a_split: Vec<VastMut<'a>>,
     b_split: Vec<VastMut<'a>>,
+    piece_work: VastMut<'a>,
 }
 
 impl<'a> Planner<'a> for SSRPlanner {
@@ -182,6 +193,7 @@ impl<'a> Planner<'a> for SSRPlanner {
         for i in 0..self.twok { // b_split
             required.push(self.piece_sz);
         }
+        required.push(self.piece_work_sz);
         return Plan {
             required_sz: required,
         }
@@ -200,12 +212,15 @@ impl<'a> Planner<'a> for SSRPlanner {
         for _i in 0..self.twok {
             b_split.push(VastMut::from(worki.next().unwrap()));
         }
+        let piece_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
         let ssr = SSR {
             params: *self,
-            f: Fermat::new(self.N),
+            F: Fermat::new(self.N),
+            f: Fermat::new(self.n),
             x: next.unwrap(),
             a_split: a_split,
-            b_split: b_split
+            b_split: b_split,
+            piece_work: piece_work,
         };
         return Box::new(ssr);
     }
@@ -243,9 +258,56 @@ fn split<'a, 'b>(
 
 impl<'a> MultiplierOps for SSR<'a> {
     fn x(&mut self, a: &mut VastMut, b: &Vast) {
+        let n = self.params.n;
         let long_sz = self.params.long_sz;
+        let twok = self.params.twok;
+        // split
         split(&mut self.a_split, &Vast::from(&*a), long_sz);
         split(&mut self.b_split, b, long_sz);
+        #[cfg(debug_assertions)]
+        {
+            println!("A:");
+            for i in 0..twok {
+                println!("{:?}", self.a_split[i as usize]);
+            }
+            println!("B:");
+            for i in 0..twok {
+                println!("{:?}", self.b_split[i as usize]);
+            }
+        }
+        // weight
+        for j in 0..twok {
+            let shift = j * n / twok;
+            self.piece_work.pod_assign_shl(
+                &self.a_split[j as usize],
+                shift
+            );
+            Fermat::mod_fermat(
+                &mut self.a_split[j as usize], 
+                &Vast::from(&self.piece_work), 
+                self.f
+            );
+            self.piece_work.pod_assign_shl(
+                &self.b_split[j as usize],
+                shift
+            );
+            Fermat::mod_fermat(
+                &mut self.b_split[j as usize], 
+                &Vast::from(&self.piece_work), 
+                self.f
+            );
+        }
+        #[cfg(debug_assertions)]
+        {
+            println!("A:");
+            for i in 0..twok {
+                println!("{:?}", self.a_split[i as usize]);
+            }
+            println!("B:");
+            for i in 0..twok {
+                println!("{:?}", self.b_split[i as usize]);
+            }
+        }
         panic!("unimplemented");
     }
 }
@@ -337,8 +399,8 @@ pub fn pick_kn(N: BigSize, k: BigSize) -> KN {
     if n <= n_max {
         assert!(divides(twok, n));
         println!("    Satisfied: N={}, k={}, twok={}, n={}", N, k, twok, n);
-        let next_n = get_next_power_of_two(n);
-        println!("    Next power of two after n: {}", next_n);
+        let next_n = pick_Nkn(n).N;
+        println!("    Next n: {}", next_n);
         let waste_bits = (next_n - piece_sz) * twok;
         println!("    Waste bits: {}", waste_bits);
         return KN {
@@ -351,6 +413,10 @@ pub fn pick_kn(N: BigSize, k: BigSize) -> KN {
 
 pub fn pick_Nkn(N_start: BigSize) -> Nkn {
     // find a suitable N, k and n
+    if N_start <= 512 {
+        println!("Do other multiplication...");
+        return Nkn {N: N_start, k: 0, n: 0};
+    }
     let N_max = N_start * 2; // I have no clue what to set this to :(
     let mut N = N_start;
     let mut best = Nkn { N: 0, k: 0, n: 0};
@@ -374,9 +440,6 @@ pub fn pick_Nkn(N_start: BigSize) -> Nkn {
         }
         N = (N / 512 + 1) * 512;
     }
-    assert_ne!(best.N, 0);
-    assert_ne!(best.k, 0);
-    assert_ne!(best.n, 0);
     println!("Final: N={} k={} n={}", best.N, best.k, best.n);
     return best;
 }
@@ -390,6 +453,9 @@ mod tests {
     #[test]
     fn pick_Nkn_1() {
         let r = pick_Nkn(5000000);
+        assert_ne!(r.N, 0);
+        assert_ne!(r.k, 0);
+        assert_ne!(r.n, 0);
         println!("{:?}", r);
     }
     #[test]

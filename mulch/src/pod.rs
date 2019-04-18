@@ -138,19 +138,6 @@ impl<T> PodOps for T where T: Pod {
     }
 }
 
-// impl Pod for Limb {
-//     fn limbs(&self) -> BigSize {
-//         return 1;
-//     }
-//     fn get_limb(&self, i: BigSize) -> Limb {
-//         if i == 0 {
-//             return *self;
-//         } else {
-//             panic!("Tried to index into a Limb other than index 0")
-//         }
-//     }
-// }
-
 macro_rules! int_pod {
     ($($i:ty)+) => {$(
         impl Pod for $i {
@@ -180,6 +167,40 @@ macro_rules! pod_eq {
             }
         }
         impl<$l> Eq for $P {}
+        impl<$l> fmt::UpperHex for $P {
+            fn fmt<'fmt>(&self, f: &mut fmt::Formatter<'fmt>) -> fmt::Result {
+                write!(f, "{}", self.to_hex())
+            }
+        }
+
+        impl<$l> fmt::Display for $P {
+            fn fmt<'fmt>(&self, f: &mut fmt::Formatter<'fmt>) -> fmt::Result {
+                return fmt::UpperHex::fmt(self, f);
+            }
+        }
+
+        impl<$l> fmt::Debug for $P {
+            fn fmt<'fmt>(&self, f: &mut fmt::Formatter<'fmt>) -> fmt::Result {
+                let mut r : fmt::Result;
+                r = write!(
+                    f,
+                    "Pod {:016X}",
+                    self.get_limb(self.limbs()-1)
+                );
+                match r {
+                    Ok(_) => {},
+                    Err(_) => {return r;}
+                }
+                for i in (0..(self.limbs()-1)).rev() {
+                    r = write!(f, ",{:016X}", self.get_limb(i));
+                    match r {
+                        Ok(_) => {},
+                        Err(_) => {return r;}
+                    }
+                }
+                return r;
+            }
+        }
     )+}
 }
 
@@ -196,6 +217,7 @@ pub trait PodMutOps: PodMut + PodOps {
     fn pod_add_assign(&mut self, a: &impl PodOps);
     fn pod_sub_assign(&mut self, a: &impl PodOps);
     fn pod_backwards_sub_assign(&mut self, a: &impl PodOps);
+    fn pod_assign_shl(&mut self, a: &impl PodOps, s: BigSize);
     fn pod_assign_mul(&mut self, a: &impl PodOps, b: &impl PodOps);
     fn pod_assign_div_qr(&mut self, r: &mut impl PodMutOps, n: &impl PodOps, d: &impl PodOps);
     fn pod_assign_hex(&mut self, src: &str);
@@ -359,6 +381,40 @@ impl<T> PodMutOps for T where T: PodMut {
         }
         if borrow > 0 {
             panic!("Vast underflow in sub_assign(Vast)");
+        }
+    }
+    fn pod_assign_shl(&mut self, a: &impl PodOps, n: BigSize) {
+        assert!(a.bits() + n <= self.bitlen());
+        // rely on integer rounding down here
+        let n_limbs = n / LIMB_SIZE;
+        let n_bits = n - (n_limbs * LIMB_SIZE);
+        let sz = a.limbs();
+        let self_sz = self.limbs();
+        assert!(n_limbs < self_sz);
+        for i in (n_limbs..sz).rev() {
+            let src_lower = i-n_limbs-1;
+            let src_upper = i-n_limbs;
+            // we need a total of LIMB_SIZE bits for each limb
+            // the upper LIMB_SIZE - n_bits of the destination comes
+            // from the lower LIMB_SIZE - n_bits of the upper source
+            let upper : Limb = a.get_limb(src_upper) << n_bits;
+            let lower : Limb;
+            if src_lower < 0 || n_bits == 0 {
+                lower = 0;
+            } else {
+                // the lower n_bits of the destination comes
+                // from the upper n_bits of the source
+                // so we discard LIMB_SIZE - n_bits of the lower source
+                lower = a.get_limb(src_lower) >> (LIMB_SIZE - n_bits);
+            }
+            self.set_limb(i, upper | lower);
+        }
+        for i in 0..n_limbs {
+            // zero the least significant bits
+            self.set_limb(i, 0);
+        }
+        for i in sz..self_sz {
+            self.set_limb(i, 0);
         }
     }
     fn pod_assign_mul(&mut self, a: &impl PodOps, b: &impl PodOps) {
