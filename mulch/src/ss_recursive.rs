@@ -167,8 +167,27 @@ impl SSRPlanner {
             piece_work_sz: piece_work_sz,
         }
     }
-    fn dft_matrix<'a>(&self, D: &mut Vec<VastMut<'a>>) {
-        
+    fn dft_matrix<'a>(&self) -> Vec<BigSize> {
+        let shift = 2 * self.n / self.twok;
+        let mut DS: Vec<BigSize> = Vec::new();
+        for i in 0..self.twok {
+            for j in 0..self.twok {
+                let e = i * j;
+                let ex = e % self.twok;
+                let s = ex * shift;
+                DS.push(s);
+            }
+        }
+//         let check = ss_dft_matrix(self.k, self.n);
+//         let mut work = Big::new(self.piece_sz * 3);
+//         for i in 0..(self.twok*self.twok) {
+//             work.zero();
+//             work[0] = 1;
+//             work <<= DS[i as usize];
+//             let de = mod_fermat(&work, self.n);
+//             assert_eq!(de, check[i as usize]);
+//         }
+        return DS;
     }
 }
 
@@ -180,6 +199,7 @@ struct SSR<'a> {
     a_split: Vec<VastMut<'a>>,
     b_split: Vec<VastMut<'a>>,
     piece_work: VastMut<'a>,
+    D: Vec<BigSize>,
 }
 
 impl<'a> SSR<'a> {
@@ -206,16 +226,17 @@ impl<'a> Planner<'a> for SSRPlanner {
         let k = self.k;
         let N = self.N;
         let mut required: Vec<BigSize> = Vec::new();
+        
         for i in 0..self.twok { // a_split
             required.push(self.piece_sz);
         }
+        
         for i in 0..self.twok { // b_split
             required.push(self.piece_sz);
         }
+        
         required.push(self.piece_work_sz);
-        for i in 0..(self.twok*self.twok) {
-            required.push(self.piece_sz);
-        }
+        
         return Plan {
             required_sz: required,
         }
@@ -239,10 +260,7 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         let piece_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
         
-        let mut D: Vec<VastMut<'a>> = Vec::new();
-        for _i in 0..(self.twok*self.twok) {
-            D.push(VastMut::from(worki.next().unwrap()));
-        }
+        let D = self.dft_matrix();
         
         let ssr = SSR {
             params: *self,
@@ -252,6 +270,7 @@ impl<'a> Planner<'a> for SSRPlanner {
             a_split: a_split,
             b_split: b_split,
             piece_work: piece_work,
+            D: D,
         };
         return Box::new(ssr);
     }
