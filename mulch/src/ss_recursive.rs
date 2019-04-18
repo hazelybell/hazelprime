@@ -179,6 +179,22 @@ struct SSR<'a> {
     piece_work: VastMut<'a>,
 }
 
+impl<'a> SSR<'a> {
+    #[cfg(debug_assertions)]
+    fn print_ab(&self) {
+        println!("A:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.a_split[i as usize]);
+        }
+        println!("B:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.b_split[i as usize]);
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    fn print_ab(&self) {}
+}
+
 impl<'a> Planner<'a> for SSRPlanner {
     fn next_goal(&self) -> Goal {
         Goal::ModN(self.n)
@@ -264,17 +280,7 @@ impl<'a> MultiplierOps for SSR<'a> {
         // split
         split(&mut self.a_split, &Vast::from(&*a), long_sz);
         split(&mut self.b_split, b, long_sz);
-        #[cfg(debug_assertions)]
-        {
-            println!("A:");
-            for i in 0..twok {
-                println!("{:?}", self.a_split[i as usize]);
-            }
-            println!("B:");
-            for i in 0..twok {
-                println!("{:?}", self.b_split[i as usize]);
-            }
-        }
+        self.print_ab();
         // weight
         for j in 0..twok {
             let shift = j * n / twok;
@@ -297,17 +303,7 @@ impl<'a> MultiplierOps for SSR<'a> {
                 self.f
             );
         }
-        #[cfg(debug_assertions)]
-        {
-            println!("A:");
-            for i in 0..twok {
-                println!("{:?}", self.a_split[i as usize]);
-            }
-            println!("B:");
-            for i in 0..twok {
-                println!("{:?}", self.b_split[i as usize]);
-            }
-        }
+        self.print_ab();
         panic!("unimplemented");
     }
 }
