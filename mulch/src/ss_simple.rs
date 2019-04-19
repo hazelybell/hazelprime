@@ -32,8 +32,8 @@ pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
     // find a suitable N, k and n
     let N_min = p_bits + 1;
     let N_max = N_min * 16; // I have no clue what to set this to :(
-    let k_max : BigSize = 5;
-    let k_min : BigSize = 5;
+    let k_max : BigSize = 16;
+    let k_min : BigSize = 1;
     let mut N = N_min;
     while N < N_max {
         println!("Trying N={}", N);
@@ -327,7 +327,7 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
         c_dft.push(ci);
     }
     // inverse DFT
-    let Dinv = ss_idft_matrix2(k, n);
+    let Dinv = ss_idft_matrix(k, n);
     println!("C:");
     let mut c_idft = vec_times_mat(c_dft, &Dinv, n);
     // unshift
