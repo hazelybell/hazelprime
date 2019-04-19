@@ -49,13 +49,13 @@ impl LongPlanner {
             Goal::ModN(n) => {
                 return LongPlanner {
                     n: n,
-                    p_bits: n*2,
+                    p_bits: n*2+2,
                 };
             }
             Goal::PBits(b) => {
                 return LongPlanner {
                     n: b,
-                    p_bits: b
+                    p_bits: b+1
                 };
             }
             Goal::Done => {
@@ -75,7 +75,7 @@ impl<'a> Planner<'a> for LongPlanner {
         Goal::Done
     }
     fn plan(&self) -> Plan {
-        let sz = div_up(self.n+1, LIMB_SIZE);
+        let sz = div_up(self.p_bits, LIMB_SIZE);
         println!("Requesting {} bits", sz * LIMB_SIZE);
         let required: Vec<BigSize> = vec![sz];
         return Plan {
@@ -129,6 +129,7 @@ struct SSRPlanner {
     piece_sz: BigSize,
     limbs_each: BigSize,
     piece_work_sz: BigSize,
+    sum_sz: BigSize,
 }
 
 impl SSRPlanner {
@@ -155,6 +156,7 @@ impl SSRPlanner {
         let piece_sz = div_up(nkn.n+1, LIMB_SIZE);
         let limbs_each = long_sz / twok;
         let piece_work_sz = piece_sz * 4;
+        let sum_sz = long_sz + (piece_sz - 1);
         return SSRPlanner {
             N: nkn.N,
             k: nkn.k,
@@ -165,6 +167,7 @@ impl SSRPlanner {
             piece_sz: piece_sz,
             limbs_each: limbs_each,
             piece_work_sz: piece_work_sz,
+            sum_sz: sum_sz,
         }
     }
     fn dft_matrix<'a>(&self) -> Vec<BigSize> {
@@ -235,6 +238,9 @@ struct SSR<'a> {
     a_dft: Vec<VastMut<'a>>,
     b_dft: Vec<VastMut<'a>>,
     dft_work: VastMut<'a>,
+    itwok: Vast<'a>,
+    Ci: Vec<Vast<'a>>,
+    sum: VastMut<'a>,
 }
 
 impl<'a> SSR<'a> {
@@ -264,6 +270,24 @@ impl<'a> SSR<'a> {
     }
     #[cfg(not(debug_assertions))]
     fn print_dft_ab(&self) {}
+    #[cfg(debug_assertions)]
+    fn print_dft_a(&self) {
+        println!("A:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.a_dft[i as usize]);
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    fn print_dft_a(&self) {}
+    #[cfg(debug_assertions)]
+    fn print_a(&self) {
+        println!("A:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.a_split[i as usize]);
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    fn print_a(&self) {}
 }
 
 impl<'a> Planner<'a> for SSRPlanner {
@@ -294,6 +318,14 @@ impl<'a> Planner<'a> for SSRPlanner {
         }
         
         required.push(self.piece_work_sz); // dft_work
+        
+        required.push(self.piece_sz); // itwok
+        
+        for i in 0..self.twok { // Ci
+            required.push(self.piece_sz);
+        }
+        
+        required.push(self.sum_sz); // sum for carrying
         
         return Plan {
             required_sz: required,
@@ -331,7 +363,38 @@ impl<'a> Planner<'a> for SSRPlanner {
         let D = self.dft_matrix();
         let Di = self.idft_matrix();
         
-        let dft_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
+        let dft_work: VastMut<'a> = VastMut::from(worki.next().unwrap());
+        
+        let mut itwok: VastMut<'a> = VastMut::from(worki.next().unwrap());
+        {
+            let mut twok_big = Big::new(self.piece_sz);
+            twok_big[0] = self.twok as Limb;
+            println!("twok_big: {}", twok_big);
+            let mut itwok_big = inv_mod_fermat(&twok_big, self.n);
+            println!("itwok: {}", itwok_big);
+            let should_be_one = mul_mod_fermat(&twok_big, &itwok_big, self.n);
+            assert!(should_be_one== 1);
+            for i in 0..itwok_big.limbs() {
+                itwok[i] = itwok_big[i];
+            }
+        }
+        
+        let mut Ci: Vec<Vast<'a>> = Vec::new(); 
+        {
+            for j in 0..self.twok {
+                let shift = j * self.n / self.twok;
+                let mut coeff = Big::new_one(self.piece_sz);
+                coeff <<= shift;
+                let invcoeff = inv_mod_fermat(&coeff, self.n);
+                let mut ci: VastMut<'a> = VastMut::from(worki.next().unwrap());
+                for i in 0..invcoeff.limbs() {
+                    ci[i] = invcoeff[i];
+                }
+                Ci.push(Vast::from(ci));
+            }
+        }
+        
+        let sum: VastMut<'a> =VastMut::from(worki.next().unwrap());
         
         let ssr = SSR {
             params: *self,
@@ -346,6 +409,9 @@ impl<'a> Planner<'a> for SSRPlanner {
             a_dft: a_dft,
             b_dft: b_dft,
             dft_work: dft_work,
+            itwok: Vast::from(itwok),
+            Ci: Ci,
+            sum: sum,
         };
         return Box::new(ssr);
     }
@@ -450,9 +516,66 @@ impl<'a> MultiplierOps for SSR<'a> {
                 self.f
             );
         }
-        self.print_dft_ab(); 
-        
-        panic!("unimplemented");
+        self.print_dft_ab();
+        // dot product and recurse!
+        for i in 0..twok {
+            self.x.x(
+                &mut self.a_dft[i as usize],
+                &Vast::from(&self.b_dft[i as usize])
+            );
+        }
+        self.print_dft_a();
+        // Inverse dft
+        for i in 0..twok {
+            self.piece_work.zero();
+            for j in 0..twok {
+                let didx = i + j * twok;
+                let shift = self.Di[didx as usize];
+                self.dft_work.zero();
+                self.dft_work.pod_assign_shl(
+                    &self.a_dft[j as usize],
+                    shift
+                );
+                self.piece_work.pod_add_assign(&self.dft_work);
+            }
+            println!("Before modf {}", self.piece_work.to_hex());
+            self.a_split[i as usize].zero();
+            Fermat::mod_fermat(
+                &mut self.a_split[i as usize],
+                &Vast::from(&self.piece_work),
+                self.f
+            );
+        }
+        println!("Before *itwok");
+        self.print_a();
+        for i in 0..twok {
+            self.x.x(
+                &mut self.a_split[i as usize],
+                &self.itwok
+            );
+        }
+        self.print_a();
+        // unweight
+        for i in 0..twok {
+            self.x.x(
+                &mut self.a_split[i as usize],
+                &self.Ci[i as usize]
+            );
+        }
+        self.print_a();
+        // do carrying
+        for i in (1..twok).rev() {
+            self.sum.pod_add_assign(&self.a_split[i as usize]);
+            self.sum.pod_shl_assign(LIMB_SIZE * self.params.limbs_each);
+        }
+        println!("{:?}", self.sum);
+        a.zero();
+        Fermat::mod_fermat(
+            a,
+            &Vast::from(&self.sum),
+            self.F
+        );
+        println!("{:?}", a);
     }
 }
 

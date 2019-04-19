@@ -32,8 +32,8 @@ pub fn get_Nkn_unbound(p_bits: BigSize) -> Nkn {
     // find a suitable N, k and n
     let N_min = p_bits + 1;
     let N_max = N_min * 16; // I have no clue what to set this to :(
-    let k_max : BigSize = 16;
-    let k_min : BigSize = 1;
+    let k_max : BigSize = 5;
+    let k_min : BigSize = 5;
     let mut N = N_min;
     while N < N_max {
         println!("Trying N={}", N);
@@ -274,8 +274,10 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
     
     // dot product
     let mut c_dft : Vec<Big> = Vec::with_capacity(pieces as usize);
+    println!("C:");
     for i in 0..pieces {
         let ci = mul_mod_fermat(&a_dft[i], &b_dft[i], n);
+        println!("{:?}", ci);
         c_dft.push(ci);
     }
     // inverse DFT
