@@ -179,4 +179,16 @@ mod tests {
         p.assign_mul(a, b);
         assert_eq!(pb.hex_str(), "CFC036BF050D730EA92C3A8E66BF44B94319958CC3C0E8FD8570CC61A7CD39CD66EFBE891948DD59F4AF2FCFC7CB63B8682B9660B3AC2142DF54E37DA1A4EDF3D0962A14463B0E5CDE726E2FD903B8FFA53AC9E2ECCCDB93B0D4078912B98887A54AA1782704F6E7AF894DA712689FDFCCDFCF33B91DB702A68AC4B22BCA7A0");
     }
+    #[test]
+    fn pod_assign_shl_() {
+        let ab = Big::from_hex("2F6DC70EE58ED84B800000000000000000");
+        let a = Vast::from(&ab);
+        let mut rb = Big::new(6);
+        let mut r = VastMut::from(&mut rb);
+        r.pod_assign_shl(&a, 60);
+        println!("{:?}", r);
+        assert_eq!(r.to_hex(), 
+            "2F6DC70EE58ED84B800000000000000000000000000000000"
+        );
+    }
 }

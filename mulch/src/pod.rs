@@ -391,13 +391,13 @@ impl<T> PodMutOps for T where T: PodMut {
         let sz = a.limbs();
         let self_sz = self.limbs();
         assert!(n_limbs < self_sz);
-        for i in (0..sz).rev() {
+        for i in (0..=sz).rev() {
             let src_lower = i-1;
             let src_upper = i;
             // we need a total of LIMB_SIZE bits for each limb
             // the upper LIMB_SIZE - n_bits of the destination comes
             // from the lower LIMB_SIZE - n_bits of the upper source
-            let upper : Limb = a.get_limb(src_upper) << n_bits;
+            let upper : Limb;
             let lower : Limb;
             if src_lower < 0 || n_bits == 0 {
                 lower = 0;
@@ -407,13 +407,18 @@ impl<T> PodMutOps for T where T: PodMut {
                 // so we discard LIMB_SIZE - n_bits of the lower source
                 lower = a.get_limb(src_lower) >> (LIMB_SIZE - n_bits);
             }
+            if src_upper >= sz {
+                upper = 0;
+            } else {
+                upper = a.get_limb(src_upper) << n_bits;
+            }
             self.set_limb(n_limbs + i, upper | lower);
         }
         for i in 0..n_limbs {
             // zero the least significant bits
             self.set_limb(i, 0);
         }
-        for i in (n_limbs+sz)..self_sz {
+        for i in (n_limbs+sz+1)..self_sz {
             self.set_limb(i, 0);
         }
     }

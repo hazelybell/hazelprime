@@ -218,6 +218,48 @@ pub fn ss_idft_matrix(k: BigSize, n: BigSize) -> Vec<Big> {
     return a;
 }
 
+pub fn ss_idft_matrix2(k: BigSize, n: BigSize) -> Vec<Big> {
+    let twok : BigSize = 1 << k;
+    let piece_sz = div_up(n+1, LIMB_SIZE);
+    // DFT/NTT/Fermat Number Transform
+    let mut prou = Big::new_one(piece_sz);
+    prou <<= (2 * n / twok); // the twokth primitive root of unity
+    let prou = prou;
+    println!("prou: {}", prou);
+    let mut iprou = Big::new_one(piece_sz);
+    for i in 0..twok-1 {
+        iprou = mul_mod_fermat(&prou, &iprou, n);
+    }
+    println!("iprou: {}", iprou);
+    let should_be_one = mul_mod_fermat(&prou, &iprou, n);
+    assert!(should_be_one == 1);
+    
+    let modf = fermat(n);
+    println!("2^n+1: {}", modf);
+    let a_elts = twok * twok;
+    // DFT matrix
+    let mut a : Vec<Big> = Vec::with_capacity(a_elts as usize);
+    let one = Big::new_one(piece_sz);
+    let mut aa = one.clone();
+    for i in 0..twok {
+        a.push(one.clone()); // fill the first col with 1/twok
+        print!("{} ", one);
+        let mut aaa = aa.clone();
+        for j in 1..twok {
+            let aaa_over_twok = mul_mod_fermat(&aaa, &one, n);
+            a.push(aaa_over_twok.clone());
+            print!("{} ", aaa_over_twok);
+            aaa = mul_mod_fermat(&aaa, &aa, n);
+            assert!(aaa.lt(&modf));
+            assert!(aaa != 0);
+        }
+        aa = mul_mod_fermat(&aa, &iprou, n);
+        println!("");
+    }
+    return a;
+}
+
+
 pub fn vec_times_mat(v: Vec<Big>, m: &Vec<Big>, n: BigSize) -> Vec<Big> {
     let mut r: Vec<Big> = Vec::with_capacity(v.len());
     let dim = v.len();
@@ -229,6 +271,7 @@ pub fn vec_times_mat(v: Vec<Big>, m: &Vec<Big>, n: BigSize) -> Vec<Big> {
                 &m[(i + j * dim)],
                 n
             );
+//             println!("{},{} {}\n{}", i, j, v[j].to_hex(), ri.to_hex())
         }
         let ri = mod_fermat(&ri, n);
         println!("{} {:?}", i, ri);
@@ -261,7 +304,9 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
         a_split[j] <<= shift;
         println!("A{}: {:?}", j, a_split[j]);
         assert!(a_split[j].lt(&nf));
+        println!("B{}: {:?}", j, b_split[j]);
         b_split[j] <<= shift;
+        println!("B{}: {:?}", j, b_split[j]);
         assert!(b_split[j].lt(&nf));
     }
     // DFT
@@ -274,14 +319,15 @@ pub fn ss_multiply2(a: Big, b: Big, params: Nkn) -> Big {
     
     // dot product
     let mut c_dft : Vec<Big> = Vec::with_capacity(pieces as usize);
-    println!("C:");
     for i in 0..pieces {
+        println!("C.{}\n  {}\n  {}", i, 
+        a_dft[i].to_hex(), b_dft[i].to_hex());
         let ci = mul_mod_fermat(&a_dft[i], &b_dft[i], n);
-        println!("{:?}", ci);
+        println!("{}", ci.to_hex());
         c_dft.push(ci);
     }
     // inverse DFT
-    let Dinv = ss_idft_matrix(k, n);
+    let Dinv = ss_idft_matrix2(k, n);
     println!("C:");
     let mut c_idft = vec_times_mat(c_dft, &Dinv, n);
     // unshift

@@ -508,13 +508,23 @@ impl<'a> MultiplierOps for SSR<'a> {
                     &self.b_split[j as usize],
                     shift
                 );
+//                 println!("{},{} {} {}", i, j, shift, self.b_split[j as usize].to_hex());
+//                 println!("{},{} {} {}", i, j, shift, self.dft_work.to_hex());
                 self.piece_work.pod_add_assign(&self.dft_work);
+//                 println!("{}", self.piece_work.to_hex());
             }
+//             println!("Before modf {}", self.piece_work.to_hex());
             Fermat::mod_fermat(
                 &mut self.b_dft[i as usize],
                 &Vast::from(&self.piece_work),
                 self.f
             );
+//             println!("After modf {}", self.b_dft[i as usize].to_hex());
+            if i == 5 {
+                assert_eq!(self.b_dft[i as usize].get_limb(0),
+                    0x9065FBFDEE10FAC3
+                )
+            }
         }
         self.print_dft_ab();
         // dot product and recurse!
@@ -536,17 +546,20 @@ impl<'a> MultiplierOps for SSR<'a> {
                     &self.a_dft[j as usize],
                     shift
                 );
+//                 println!("{},{} {} {}", i, j, shift, self.dft_work.to_hex());
                 self.piece_work.pod_add_assign(&self.dft_work);
+//                 println!("{}", self.piece_work.to_hex());
             }
-            println!("Before modf {}", self.piece_work.to_hex());
+//             println!("Before modf {}", self.piece_work.to_hex());
             self.a_split[i as usize].zero();
             Fermat::mod_fermat(
                 &mut self.a_split[i as usize],
                 &Vast::from(&self.piece_work),
                 self.f
             );
+//             println!("After modf {}", self.a_split[i as usize].to_hex());
         }
-        println!("Before *itwok");
+//         println!("Before *itwok");
         self.print_a();
         for i in 0..twok {
             self.x.x(
@@ -568,14 +581,15 @@ impl<'a> MultiplierOps for SSR<'a> {
             self.sum.pod_add_assign(&self.a_split[i as usize]);
             self.sum.pod_shl_assign(LIMB_SIZE * self.params.limbs_each);
         }
-        println!("{:?}", self.sum);
+        self.sum.pod_add_assign(&self.a_split[0]);
+//         println!("{:?}", self.sum);
         a.zero();
         Fermat::mod_fermat(
             a,
             &Vast::from(&self.sum),
             self.F
         );
-        println!("{:?}", a);
+//         println!("{:?}", a);
     }
 }
 
