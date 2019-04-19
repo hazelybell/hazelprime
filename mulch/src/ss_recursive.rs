@@ -154,7 +154,7 @@ impl SSRPlanner {
         assert!(divides(twok, long_sz));
         let piece_sz = div_up(nkn.n+1, LIMB_SIZE);
         let limbs_each = long_sz / twok;
-        let piece_work_sz = piece_sz * 2;
+        let piece_work_sz = piece_sz * 4;
         return SSRPlanner {
             N: nkn.N,
             k: nkn.k,
@@ -189,6 +189,37 @@ impl SSRPlanner {
 //         }
         return DS;
     }
+    fn idft_matrix(&self) -> Vec<BigSize> {
+        let shift = 2 * self.n / self.twok;
+        let mut DS: Vec<BigSize> = Vec::new();
+        for i in 0..self.twok {
+            for j in 0..self.twok {
+                let e = i * j;
+                let mut ex = (e * -1 + self.twok) % self.twok;
+                if ex < 0 {
+                    ex += self.twok;
+                }
+                let s = ex * shift;
+                DS.push(s);
+            }
+        }
+//         let check = ss_idft_matrix(self.k, self.n);
+//         let mut work = Big::new(self.piece_sz * 4);
+//         let mut twok_big = Big::new(self.piece_sz);
+//         twok_big[0] = self.twok as Limb;
+//         println!("twok_big: {}", twok_big);
+//         let mut itwok = inv_mod_fermat(&twok_big, self.n);
+//         println!("itwok: {}", itwok);
+//         for i in 0..(self.twok*self.twok) {
+//             println!("{},{}: {}", i % self.twok, i / self.twok, DS[i as usize]);
+//             work.zero();
+//             work[0] = 1;
+//             work <<= DS[i as usize];
+//             let de = mod_fermat(&((&work) * (&itwok)), self.n);
+//             assert_eq!(de, check[i as usize]);
+//         }
+        return DS;
+    }
 }
 
 struct SSR<'a> {
@@ -200,6 +231,10 @@ struct SSR<'a> {
     b_split: Vec<VastMut<'a>>,
     piece_work: VastMut<'a>,
     D: Vec<BigSize>,
+    Di: Vec<BigSize>,
+    a_dft: Vec<VastMut<'a>>,
+    b_dft: Vec<VastMut<'a>>,
+    dft_work: VastMut<'a>,
 }
 
 impl<'a> SSR<'a> {
@@ -216,6 +251,19 @@ impl<'a> SSR<'a> {
     }
     #[cfg(not(debug_assertions))]
     fn print_ab(&self) {}
+    #[cfg(debug_assertions)]
+    fn print_dft_ab(&self) {
+        println!("A:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.a_dft[i as usize]);
+        }
+        println!("B:");
+        for i in 0..self.params.twok {
+            println!("{:?}", self.b_dft[i as usize]);
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    fn print_dft_ab(&self) {}
 }
 
 impl<'a> Planner<'a> for SSRPlanner {
@@ -235,7 +283,17 @@ impl<'a> Planner<'a> for SSRPlanner {
             required.push(self.piece_sz);
         }
         
-        required.push(self.piece_work_sz);
+        required.push(self.piece_work_sz); // piece_work
+        
+        for i in 0..self.twok { // a_dft
+            required.push(self.piece_sz);
+        }
+        
+        for i in 0..self.twok { // b_dft
+            required.push(self.piece_sz);
+        }
+        
+        required.push(self.piece_work_sz); // dft_work
         
         return Plan {
             required_sz: required,
@@ -260,7 +318,20 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         let piece_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
         
+        let mut a_dft: Vec<VastMut<'a>> = Vec::new();
+        for _i in 0..self.twok {
+            a_dft.push(VastMut::from(worki.next().unwrap()));
+        }
+        
+        let mut b_dft: Vec<VastMut<'a>> = Vec::new();
+        for _i in 0..self.twok {
+            b_dft.push(VastMut::from(worki.next().unwrap()));
+        }
+        
         let D = self.dft_matrix();
+        let Di = self.idft_matrix();
+        
+        let dft_work: VastMut<'a> =VastMut::from(worki.next().unwrap());
         
         let ssr = SSR {
             params: *self,
@@ -271,6 +342,10 @@ impl<'a> Planner<'a> for SSRPlanner {
             b_split: b_split,
             piece_work: piece_work,
             D: D,
+            Di: Di,
+            a_dft: a_dft,
+            b_dft: b_dft,
+            dft_work: dft_work,
         };
         return Box::new(ssr);
     }
@@ -338,6 +413,44 @@ impl<'a> MultiplierOps for SSR<'a> {
             );
         }
         self.print_ab();
+        // dft
+        for i in 0..twok {
+            self.piece_work.zero();
+            for j in 0..twok {
+                let didx = i + j * twok;
+                let shift = self.D[didx as usize];
+                self.dft_work.zero();
+                self.dft_work.pod_assign_shl(
+                    &self.a_split[j as usize],
+                    shift
+                );
+                self.piece_work.pod_add_assign(&self.dft_work);
+            }
+            Fermat::mod_fermat(
+                &mut self.a_dft[i as usize],
+                &Vast::from(&self.piece_work),
+                self.f
+            );
+        }
+        for i in 0..twok {
+            self.piece_work.zero();
+            for j in 0..twok {
+                let didx = i + j * twok;
+                let shift = self.D[didx as usize];
+                self.dft_work.zero();
+                self.dft_work.pod_assign_shl(
+                    &self.b_split[j as usize],
+                    shift
+                );
+                self.piece_work.pod_add_assign(&self.dft_work);
+            }
+            Fermat::mod_fermat(
+                &mut self.b_dft[i as usize],
+                &Vast::from(&self.piece_work),
+                self.f
+            );
+        }
+        self.print_dft_ab(); 
         
         panic!("unimplemented");
     }
