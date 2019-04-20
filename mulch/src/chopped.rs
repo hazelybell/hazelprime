@@ -6,19 +6,19 @@ use crate::limb::{*};
 use crate::pod::{*};
 use crate::vast::{*};
 
-pub struct Chopped<'a> {
-    u: Vast<'a>,
+pub struct Chopped<T: Pod> {
+    u: T,
     start: BigSize,
     length: BigSize
 }
 
-impl<'a> Chopped<'a> {
-    pub fn chop(v: Vast<'a>, start: BigSize, length: BigSize) -> Chopped<'a> {
+impl<T: Pod> Chopped<T> {
+    pub fn chop(v: T, start: BigSize, length: BigSize) -> Chopped<T> {
         Chopped {u: v, start: start, length: length}
     }
 }
 
-impl<'a> Pod for Chopped<'a> {
+impl<T: Pod> Pod for Chopped<T> {
     fn limbs(&self) -> BigSize {
         div_up(self.length, LIMB_SIZE)
     }
@@ -39,11 +39,11 @@ impl<'a> Pod for Chopped<'a> {
         // this is like a shift left
         // the lower destination limb bits come from 
         // the upper LIMB_SIZE - start source limb bits
-        let dst_lower = self.u[src_limb_start + i] >> src_upper_bits;
+        let dst_lower = self.u.get_limb(src_limb_start + i) >> src_upper_bits;
         let dst_upper;
         let over = src_limb_start + i + 1 >= self.u.limbs();
         if src_lower_bits < 64 && !over {
-            dst_upper = self.u[src_limb_start + i + 1]
+            dst_upper = self.u.get_limb(src_limb_start + i + 1)
             << src_lower_bits;
         } else {
             dst_upper = 0;
@@ -69,6 +69,6 @@ impl<'a> Pod for Chopped<'a> {
 
 pod_eq! {
     lifetime 'a;
-    Chopped<'a>;
+    Chopped<Vast<'a>>;
 }
 
