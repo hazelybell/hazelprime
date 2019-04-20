@@ -299,12 +299,14 @@ mod tests {
         let ba = Big::from_hex(x);
         let mut bs = Big::new_one(3);
         bs <<= 32;
-        let c = mod_fermat(&(ba * inv_mod_fermat(&bs, n)), n);
+        let c = ba * inv_mod_fermat(&bs, n);
         let mut bb = Big::from_hex(x);
         let mut b = VastMut::from(&mut bb);
         let mut bw = Big::new(b.limbs() + div_up(n+1, LIMB_SIZE));
         let mut w = VastMut::from(&mut bw);
         Fermat::mod_fermat_shifted(&mut b, -32, Fermat::new(n), &mut w);
+        println!("{}", c.to_hex());
+        println!("{}", bb.to_hex());
         assert_eq!(c.to_hex(), bb.to_hex());
     }
 }

@@ -238,7 +238,7 @@ struct SSR<'a> {
     a_dft: Vec<VastMut<'a>>,
     b_dft: Vec<VastMut<'a>>,
     dft_work: VastMut<'a>,
-    Ci: Vec<Vast<'a>>,
+    Ci: Vec<isize>,
     sum: VastMut<'a>,
 }
 
@@ -318,10 +318,6 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         required.push(self.piece_work_sz); // dft_work
         
-        for i in 0..self.twok { // Ci
-            required.push(self.piece_sz);
-        }
-        
         required.push(self.sum_sz); // sum for carrying
         
         return Plan {
@@ -362,20 +358,10 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         let dft_work: VastMut<'a> = VastMut::from(worki.next().unwrap());
         
-        let mut Ci: Vec<Vast<'a>> = Vec::new(); 
-        {
-            for j in 0..self.twok {
-                let shift = j * self.n / self.twok;
-                let mut coeff = Big::new_one(self.piece_sz);
-                coeff <<= shift;
-                coeff <<= self.k;
-                let invcoeff = inv_mod_fermat(&coeff, self.n);
-                let mut ci: VastMut<'a> = VastMut::from(worki.next().unwrap());
-                for i in 0..invcoeff.limbs() {
-                    ci[i] = invcoeff[i];
-                }
-                Ci.push(Vast::from(ci));
-            }
+        let mut Ci: Vec<isize> = Vec::new(); 
+        for j in 0..self.twok {
+            let shift = j * self.n / self.twok + self.k;
+            Ci.push(-shift);
         }
         
         let sum: VastMut<'a> =VastMut::from(worki.next().unwrap());
@@ -528,9 +514,12 @@ impl<'a> MultiplierOps for SSR<'a> {
         self.print_a();
         // unweight
         for i in 0..twok {
-            self.x.x(
+            println!("{}: {} {}", i, self.Ci[i as usize], self.a_split[i as usize].to_hex());
+            Fermat::mod_fermat_shifted(
                 &mut self.a_split[i as usize],
-                &self.Ci[i as usize]
+                self.Ci[i as usize],
+                self.f,
+                &mut self.piece_work
             );
         }
         self.print_a();
