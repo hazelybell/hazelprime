@@ -107,15 +107,20 @@ impl Fermat {
         dest: &mut VastMut<'a>,
         src: &Vast<'_>,
         shift: isize,
-        f: Fermat
+        f: Fermat,
+        w: &mut VastMut,
     ) {
         dest.zero();
+        let w_shift = pmod(shift, f.n);
+        w.pod_assign_shl(src, w_shift);
+        let w = Vast::from(&*w);
         let mut mod_f = SVastMut {v: VastMut {v: dest.v}, negative: false};
-        let src_bits = src.bits();
+        let src_bits = w.bits();
         let iters = div_up(src_bits, f.n);
 //         println!("iters: {}", iters);
 //         println!("src: {}", src.to_hex());
         let real_start = div_down(shift, f.n);
+//         println!("real_start: {}", real_start);
         for i in 0..iters {
             let ri = i + real_start;
             let chunk: BigSize;
@@ -127,7 +132,7 @@ impl Fermat {
             if chunk == 0 {
                 break;
             }
-            let piece = Chopped::chop(src.clone(), f.n*i, chunk);
+            let piece = Chopped::chop(w.clone(), f.n*i, chunk);
 //             println!("start: {} chunk: {}: {}", f.n*i, chunk, piece.to_hex());
             if pmod(ri, 2) == 0 {
 //                 println!("i={} +{}", i, piece.to_hex());
@@ -188,7 +193,7 @@ pod_eq! {
 mod tests {
     use super::{*};
     use crate::big::{*};
-    use crate::big_mod_f::mod_fermat;
+    use crate::big_mod_f::{*};
     #[test]
     fn fermat_1() {
         let f = Fermat::new(64);
@@ -256,7 +261,9 @@ mod tests {
         let c = mod_fermat(&ba, n);
         let a = Vast::from(&ba);
         let mut r = VastMut::from(&mut br);
-        Fermat::mod_fermat_shifted(&mut r, &a, 0, Fermat::new(n));
+        let mut bw = Big::new(a.limbs() + div_up(n+1, LIMB_SIZE));
+        let mut w = VastMut::from(&mut bw);
+        Fermat::mod_fermat_shifted(&mut r, &a, 0, Fermat::new(n), &mut w);
         assert_eq!(c.to_hex(), br.to_hex());
     }
     #[test]
@@ -270,7 +277,26 @@ mod tests {
         let c = mod_fermat(&ba, n);
         let b = Vast::from(&bb);
         let mut r = VastMut::from(&mut br);
-        Fermat::mod_fermat_shifted(&mut r, &b, 1, Fermat::new(n));
+        let mut bw = Big::new(b.limbs() + div_up(n+1, LIMB_SIZE));
+        let mut w = VastMut::from(&mut bw);
+        Fermat::mod_fermat_shifted(&mut r, &b, 1, Fermat::new(n), &mut w);
+        assert_eq!(c.to_hex(), br.to_hex());
+    }
+    #[test]
+    fn mod_fermat_shifted_n1() {
+        let n = 30;
+        let x = "FFFFFFFF";
+        let ba = Big::from_hex(x);
+        let mut bs = Big::new_one(1);
+        bs <<= 1;
+        let c = mod_fermat(&(ba * inv_mod_fermat(&bs, n)), n);
+        let bb = Big::from_hex(x);
+        let mut br = Big::new(1);
+        let b = Vast::from(&bb);
+        let mut r = VastMut::from(&mut br);
+        let mut bw = Big::new(b.limbs() + div_up(n+1, LIMB_SIZE));
+        let mut w = VastMut::from(&mut bw);
+        Fermat::mod_fermat_shifted(&mut r, &b, -1, Fermat::new(n), &mut w);
         assert_eq!(c.to_hex(), br.to_hex());
     }
 }
