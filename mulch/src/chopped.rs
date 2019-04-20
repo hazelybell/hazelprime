@@ -93,7 +93,7 @@ impl<T: Pod> Pod for Shifted<T> {
         let sz = self.u.limbs();
         if n_limbs <= i && i <= (n_limbs+sz) {
             let src_lower = (i-n_limbs)-1;
-            let src_upper = (i-n_limbs);
+            let src_upper = i-n_limbs;
             // we need a total of LIMB_SIZE bits for each limb
             // the upper LIMB_SIZE - n_bits of the destination comes
             // from the lower LIMB_SIZE - n_bits of the upper source
@@ -123,6 +123,29 @@ impl<T: Pod> Pod for Shifted<T> {
 }
 
 
+pod_eq! {
+    lifetime 'a;
+    Shifted<Vast<'a>>;
+}
+
+// **************************************************************************
+// * tests                                                                  *
+// **************************************************************************
+#[cfg(test)]
+mod tests {
+    use super::{*};
+    use crate::big::{*};
+    #[test]
+    fn shifted_() {
+        let ab = Big::from_hex("2F6DC70EE58ED84B800000000000000000");
+        let a = Vast::from(&ab);
+        let r = Shifted::shl(a, 60);
+        println!("{:?}", r);
+        assert_eq!(r.to_hex(), 
+            "2F6DC70EE58ED84B800000000000000000000000000000000"
+        );
+    }
+}
 
 
 
