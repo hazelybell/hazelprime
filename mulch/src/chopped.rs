@@ -66,9 +66,64 @@ impl<T: Pod> Pod for Chopped<T> {
     }
 }
 
-
 pod_eq! {
     lifetime 'a;
     Chopped<Vast<'a>>;
 }
+
+pub struct Shifted<T: Pod> {
+    u: T,
+    shl: isize,
+}
+
+impl<T: Pod> Shifted<T> {
+    pub fn shl(v: T, shift: isize) -> Shifted<T> {
+        Shifted {u: v, shl: shift}
+    }
+}
+
+impl<T: Pod> Pod for Shifted<T> {
+    fn limbs(&self) -> BigSize {
+        div_up(self.u.limbs()*LIMB_SIZE + self.shl, LIMB_SIZE)
+    }
+    fn get_limb(&self, i: BigSize) -> Limb {
+        let n = self.shl;
+        let n_limbs = n / LIMB_SIZE;
+        let n_bits = n - (n_limbs * LIMB_SIZE);
+        let sz = self.u.limbs();
+        if n_limbs <= i && i <= (n_limbs+sz) {
+            let src_lower = (i-n_limbs)-1;
+            let src_upper = (i-n_limbs);
+            // we need a total of LIMB_SIZE bits for each limb
+            // the upper LIMB_SIZE - n_bits of the destination comes
+            // from the lower LIMB_SIZE - n_bits of the upper source
+            let upper : Limb;
+            let lower : Limb;
+            if src_lower < 0 || n_bits == 0 {
+                lower = 0;
+            } else {
+                // the lower n_bits of the destination comes
+                // from the upper n_bits of the source
+                // so we discard LIMB_SIZE - n_bits of the lower source
+                lower = self.u.get_limb(src_lower) >> (LIMB_SIZE - n_bits);
+            }
+            if src_upper >= sz {
+                upper = 0;
+            } else {
+                upper = self.u.get_limb(src_upper) << n_bits;
+            }
+            return upper | lower;
+        } else if i < n_limbs {
+            return 0;
+        } else if i > n_limbs+sz {
+            return 0;
+        };
+        unreachable!();
+    }
+}
+
+
+
+
+
 
