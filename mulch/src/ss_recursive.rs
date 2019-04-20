@@ -238,7 +238,6 @@ struct SSR<'a> {
     a_dft: Vec<VastMut<'a>>,
     b_dft: Vec<VastMut<'a>>,
     dft_work: VastMut<'a>,
-    itwok: Vast<'a>,
     Ci: Vec<Vast<'a>>,
     sum: VastMut<'a>,
 }
@@ -319,8 +318,6 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         required.push(self.piece_work_sz); // dft_work
         
-        required.push(self.piece_sz); // itwok
-        
         for i in 0..self.twok { // Ci
             required.push(self.piece_sz);
         }
@@ -365,26 +362,13 @@ impl<'a> Planner<'a> for SSRPlanner {
         
         let dft_work: VastMut<'a> = VastMut::from(worki.next().unwrap());
         
-        let mut itwok: VastMut<'a> = VastMut::from(worki.next().unwrap());
-        {
-            let mut twok_big = Big::new(self.piece_sz);
-            twok_big[0] = self.twok as Limb;
-            println!("twok_big: {}", twok_big);
-            let mut itwok_big = inv_mod_fermat(&twok_big, self.n);
-            println!("itwok: {}", itwok_big);
-            let should_be_one = mul_mod_fermat(&twok_big, &itwok_big, self.n);
-            assert!(should_be_one== 1);
-            for i in 0..itwok_big.limbs() {
-                itwok[i] = itwok_big[i];
-            }
-        }
-        
         let mut Ci: Vec<Vast<'a>> = Vec::new(); 
         {
             for j in 0..self.twok {
                 let shift = j * self.n / self.twok;
                 let mut coeff = Big::new_one(self.piece_sz);
                 coeff <<= shift;
+                coeff <<= self.k;
                 let invcoeff = inv_mod_fermat(&coeff, self.n);
                 let mut ci: VastMut<'a> = VastMut::from(worki.next().unwrap());
                 for i in 0..invcoeff.limbs() {
@@ -409,7 +393,6 @@ impl<'a> Planner<'a> for SSRPlanner {
             a_dft: a_dft,
             b_dft: b_dft,
             dft_work: dft_work,
-            itwok: Vast::from(itwok),
             Ci: Ci,
             sum: sum,
         };
@@ -485,7 +468,6 @@ impl<'a> MultiplierOps for SSR<'a> {
             for j in 0..twok {
                 let didx = i + j * twok;
                 let shift = self.D[didx as usize];
-                //self.dft_work.zero();
                 self.dft_work.pod_assign_shl(
                     &self.a_split[j as usize],
                     shift
@@ -503,7 +485,6 @@ impl<'a> MultiplierOps for SSR<'a> {
             for j in 0..twok {
                 let didx = i + j * twok;
                 let shift = self.D[didx as usize];
-                //self.dft_work.zero();
                 self.dft_work.pod_assign_shl(
                     &self.b_split[j as usize],
                     shift
@@ -531,7 +512,6 @@ impl<'a> MultiplierOps for SSR<'a> {
             for j in 0..twok {
                 let didx = i + j * twok;
                 let shift = self.Di[didx as usize];
-                self.dft_work.zero();
                 self.dft_work.pod_assign_shl(
                     &self.a_dft[j as usize],
                     shift
@@ -543,13 +523,6 @@ impl<'a> MultiplierOps for SSR<'a> {
                 &mut self.a_split[i as usize],
                 &Vast::from(&self.piece_work),
                 self.f
-            );
-        }
-        self.print_a();
-        for i in 0..twok {
-            self.x.x(
-                &mut self.a_split[i as usize],
-                &self.itwok
             );
         }
         self.print_a();
