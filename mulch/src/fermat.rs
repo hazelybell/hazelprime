@@ -142,21 +142,21 @@ mod tests {
         assert_eq!(big_work.to_hex(), "705EB5C093303072599253B8A1DAC0361ED48C086047B568C2521C9B7220F38DE2C8");
         assert_eq!(big_p.to_hex(), "642D529FB485384FF88A47B97F18CDACAA");
     }
-//     #[test]
-//     fn mul_mod_fermat_assign() {
-//         let n = 136;
-//         let f = Fermat::new(n);
-//         let mut big_a = Big::from_hex("9D68E100A50B479104B85497A9BA510639");
-//         let big_b = Big::from_hex("B6C0259E16F63F000194C4D5BBE3BB3908");
-//         let mut big_work = Big::new(div_up(n+1, LIMB_SIZE)*2);
-//         Fermat::mul_mod_fermat_assign(
-//             VastMut::from(&mut big_a),
-//             &Vast::from(&big_b),
-//             f,
-//             VastMut::from(&mut big_work)
-//         );
-//         assert_eq!(big_b.to_hex(), "B6C0259E16F63F000194C4D5BBE3BB3908");
-//         assert_eq!(big_work.to_hex(), "705EB5C093303072599253B8A1DAC0361ED48C086047B568C2521C9B7220F38DE2C8");
-//         assert_eq!(big_a.to_hex(), "642D529FB485384FF88A47B97F18CDACAA");
-//     }
+    #[test]
+    fn mul_mod_fermat_assign() {
+        let n = 136;
+        let f = Fermat::new(n);
+        let mut big_a = Big::from_hex("9D68E100A50B479104B85497A9BA510639");
+        let big_b = Big::from_hex("B6C0259E16F63F000194C4D5BBE3BB3908");
+        let mut big_work = Big::new(div_up(n+1, LIMB_SIZE)*2);
+        Fermat::mul_mod_fermat_assign(
+            &mut VastMut::from(&mut big_a),
+            &Vast::from(&big_b),
+            f,
+            &mut VastMut::from(&mut big_work)
+        );
+        assert_eq!(big_b.to_hex(), "B6C0259E16F63F000194C4D5BBE3BB3908");
+        assert_eq!(big_work.to_hex(), "705EB5C093303072599253B8A1DAC0361ED48C086047B568C2521C9B7220F38DE2C8");
+        assert_eq!(big_a.to_hex(), "642D529FB485384FF88A47B97F18CDACAA");
+    }
 }
