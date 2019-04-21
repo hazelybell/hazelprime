@@ -299,7 +299,7 @@ mod tests {
         let ba = Big::from_hex(x);
         let mut bs = Big::new_one(3);
         bs <<= 32;
-        let c = ba * inv_mod_fermat(&bs, n);
+        let c = mod_fermat(&(ba * inv_mod_fermat(&bs, n)), n);
         let mut bb = Big::from_hex(x);
         let mut b = VastMut::from(&mut bb);
         let mut bw = Big::new(b.limbs() + div_up(n+1, LIMB_SIZE));

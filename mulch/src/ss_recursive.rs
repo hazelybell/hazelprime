@@ -49,7 +49,7 @@ impl LongPlanner {
             Goal::ModN(n) => {
                 return LongPlanner {
                     n: n,
-                    p_bits: n*2+2,
+                    p_bits: n*2+2+LIMB_SIZE,
                 };
             }
             Goal::PBits(b) => {
@@ -514,6 +514,7 @@ impl<'a> MultiplierOps for SSR<'a> {
         self.print_a();
         // unweight
         for i in 0..twok {
+            #[cfg(debug_assertions)]
             println!("{}: {} {}", i, self.Ci[i as usize], self.a_split[i as usize].to_hex());
             Fermat::mod_fermat_shifted(
                 &mut self.a_split[i as usize],
@@ -524,6 +525,7 @@ impl<'a> MultiplierOps for SSR<'a> {
         }
         self.print_a();
         // do carrying
+        self.sum.zero();
         for i in (1..twok).rev() {
             self.sum.pod_add_assign(&self.a_split[i as usize]);
             self.sum.pod_shl_assign(LIMB_SIZE * self.params.limbs_each);
@@ -545,7 +547,7 @@ fn pick_multiplier<'a>(goal: Goal) -> Box<dyn Planner<'a>> {
         Goal::PBits(b) => { bits = b; }
         Goal::Done => { panic!("Recursion error, planning for done!"); }
     }
-    if bits > 512 {
+    if bits > 1024 {
         return Box::new(SSRPlanner::new(goal));
     } else {
         return Box::new(LongPlanner::new(goal));
@@ -648,7 +650,8 @@ pub fn pick_Nkn(N_start: BigSize) -> Nkn {
     let mut best = Nkn { N: 0, k: 0, n: 0};
     let optimal_twok = (N_start as f64).sqrt();
     let optimal_k = optimal_twok.log2();
-    let k: BigSize = optimal_k.floor() as BigSize;
+//     let k: BigSize = optimal_k.floor() as BigSize;
+    let k: BigSize = 3;
     println!(
         "Optimal twok={} k={} k={}",
         optimal_twok, optimal_k, k);
@@ -754,10 +757,43 @@ mod tests {
              3E1F7310289C6E4AF589914E6FCAC46673D036908906B308CB301134B6F47432"
             );
     }
-//     #[test]
-//     fn make_plan_1() {
-//         let plan = make_plan(3442990);
-//         println!("{:?}", plan);
-// //         assert!(false);
-//     }
+    #[test]
+    fn multiply_2048_direct_2() {
+        let mut bo = Big::from_hex(
+            "B954E7DFEE6CCE82F19BC30B53E6B6E15081CD494DD1652CEA6A30D134316E1\
+            452C5BB2012B0889BB5A148093ED8CA2DDA1FA3E09D4473C6EAA90FC7809247C\
+            FB7FE805D7095BD679653E016B74FFA844E7401BBE68BB7B25754B87F0D07AD0\
+            72DBBEAB6F3E9B7C94ED93B8665FEBEE18091EB2BDFB021A5DA9DDC981F23E12"
+        );
+        let a_sz = bo.limbs()*2;
+        let mut ba = Big::new(a_sz);
+        let bb = Big::from_hex(
+            "45BAA2EE705DDC4BDB71C3B963B612EC2CFE3B14E836C9988D260410DC9CF4C\
+            B11C1E091B2EE874887BFBFBB5FD136859D2E887D96F43D0328C0FF3BAFDF67C\
+            E3C71874F014F0C076109C3112C9C051F88B60F929967758F58E5041728C98B5\
+            0B099D03817A54400BB065726B0D5D8DB328957083535EF65229F3FC0C65F691"
+        );
+        let mut a: VastMut = VastMut::from(&mut ba);
+        let b: Vast = Vast::from(&bb);
+        let p_bits = b.bits() + bo.bits();
+        println!("{} {} {}", p_bits, bo.bits(), b.bits());
+        let mut workspaces: Vec<Vec<Big>> = Vec::new();
+        let mut mult = recursive_setup(p_bits, &mut workspaces);
+        a.pod_assign(&bo);
+        println!("{}", a.to_hex());
+        mult.x(&mut a, &b);
+        a.pod_assign(&bo);
+        println!("{}", a.to_hex());
+        mult.x(&mut a, &b);
+        assert_eq!(a.to_hex(), 
+              "327B00242CFAEE8DF0C4F7486CADB351CEABFBDCF340A119E34DC3BEFD209D\
+             6408553EA56FEC93DED68F3FFB9BABB60E3E0C03FF652DB955AACE4F05576796\
+             3E8DA37B7C7FD5C35A29AE814656217397F562B3E5527F49DFAC585F32E8B905\
+             ADCB3C58F3C0F4D3511A1E02A357EBE095371FAEC2F1616595CBA68029323FF8\
+             916FB9E7792750B8309B1322E8A1B8038881CE87B99F241A1C475629ACF29077\
+             A8A06FED983FF02114C3E7D57CFF99EAB76323E2B356E24A0CC49618BE216A2A\
+             C97DB6185B92275311C91B2B337B38F6839960047A9971BFE776668CEB0802DC\
+             3E1F7310289C6E4AF589914E6FCAC46673D036908906B308CB301134B6F47432"
+            );
+    }
 }

@@ -212,6 +212,7 @@ pub trait PodMut: Pod {
 
 pub trait PodMutOps: PodMut + PodOps {
     fn zero(&mut self);
+    fn pod_assign(&mut self, a: &impl PodOps);
     fn pod_shl_assign(&mut self, n: BigSize);
     fn pod_shr_assign(&mut self, n: BigSize);
     fn pod_add_assign(&mut self, a: &impl PodOps);
@@ -226,6 +227,14 @@ pub trait PodMutOps: PodMut + PodOps {
 impl<T> PodMutOps for T where T: PodMut {
     fn zero(&mut self) {
         for i in 0..self.limbs() {
+            self.set_limb(i, 0);
+        }
+    }
+    fn pod_assign(&mut self, a: &impl PodOps) {
+        for i in 0..a.limbs() {
+            self.set_limb(i, a.get_limb(i));
+        }
+        for i in a.limbs()..self.limbs() {
             self.set_limb(i, 0);
         }
     }
@@ -428,7 +437,10 @@ impl<T> PodMutOps for T where T: PodMut {
         let b_sz = b.min_limbs();
         let p_sz = p.limbs();
         p.zero();
-        assert!(p_sz >= a_sz + b_sz);
+        if p_sz < a_sz + b_sz {
+            println!("p_sz: {} a_sz: {} b_sz: {}", p_sz, a_sz, b_sz);
+            panic!("p_sz < a_sz + b_sz");
+        }
         for j in 0..b_sz {
             let mut carry : Limb2 = 0;
             for i in 0..a_sz {
