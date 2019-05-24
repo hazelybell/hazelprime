@@ -45,6 +45,12 @@ pub fn make_big(item: TokenStream) -> TokenStream {
             fn get_limb(&self, i: usize) -> &Limb {
                 self.v.get(i).unwrap()
             }
+            fn as_slice(&self) -> &[Limb] {
+                &self.v
+            }
+            fn as_mut_slice(&mut self) -> &mut [Limb] {
+                &mut self.v
+            }
         }
     };
     let result = quote! {
