@@ -1,0 +1,16 @@
+[package]
+name = "mulch2_macro"
+version = "0.1.0"
+authors = ["Hazel Victoria Campbell <cargo@orezpraw.com>"]
+edition = "2018"
+workspace = ".."
+
+[dependencies]
+syn = "0.15"
+quote = "0.6"
+proc-macro2 = ""
+
+[lib]
+proc-macro = true
+doctest = false
+
