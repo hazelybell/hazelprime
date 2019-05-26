@@ -19,21 +19,3 @@ impl<T> PodOps for T where T: Pod {
     }
 }
 
-pub struct PodIterator<'a, T: Pod> {
-    pod: &'a T,
-    i: usize
-}
-
-impl<'a, T> Iterator for PodIterator<'a, T> where T: Pod {
-    type Item = &'a Limb;
-    fn next(&mut self) -> Option<&'a Limb> {
-        let r: Option<&'a Limb>;
-        if self.i < self.pod.limbs() {
-            r = Some(self.pod.get_limb(self.i));
-        } else {
-            r = None;
-        }
-        self.i += 1;
-        return r;
-    }
-}
