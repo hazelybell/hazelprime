@@ -69,7 +69,7 @@ impl<T> ResOps for T where T: ResBasics {
 mod tests {
     use super::{*};
     #[test]
-    fn new_from_hex() {
+    fn hex() {
         let mut b = Residue2048::new();
         b.from_hex(
               "327B00242CFAEE8DF0C4F7486CADB351CEABFBDCF340A119E34DC3BEFD209D\

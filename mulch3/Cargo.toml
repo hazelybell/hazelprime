@@ -1,0 +1,18 @@
+[package]
+name = "mulch3"
+version = "0.1.0"
+authors = ["Hazel Victoria Campbell <cargo@orezpraw.com>"]
+edition = "2018"
+workspace = ".."
+build="build/main.rs"
+
+[dependencies]
+
+[build-dependencies]
+
+
+[lib]
+doctest = false
+
+[features]
+no-bounds-checks = []

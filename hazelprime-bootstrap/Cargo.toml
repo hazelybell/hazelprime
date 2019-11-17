@@ -1,0 +1,23 @@
+[package]
+name = "hazelprime-bootstrap"
+version = "0.0.1"
+authors = ["Hazel Victoria Campbell <cargo@orezpraw.com>"]
+edition = "2018"
+workspace = ".."
+build = "build.rs"
+
+[dependencies]
+rug = { version="1.6.0", features=["integer"] }
+select-rustc = "0.1.2"
+
+[build-dependencies]
+version_check = "0.9.1"
+quote = "1.0.2"
+
+[lib]
+doctest = false
+
+[features]
+# Currently only used for enabling macro tracing
+trace_macros = []
+

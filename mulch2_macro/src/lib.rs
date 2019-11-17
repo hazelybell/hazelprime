@@ -1,4 +1,6 @@
 #![warn(rust_2018_idioms)]
+#![recursion_limit="128"]
+
 
 extern crate proc_macro;
 #[macro_use]
