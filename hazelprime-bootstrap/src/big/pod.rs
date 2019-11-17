@@ -1,20 +1,34 @@
 #![warn(rust_2018_idioms)]
 
+macro_rules! use_podn_with {
+    () => {
+        use std::cmp::Ordering;
+        use std::cmp::PartialOrd;
+    }
+}
+
+macro_rules! use_add_signed {
+    () => {
+        use std::ops::Add;
+        use std::ops::AddAssign;
+    }
+}
+
+macro_rules! use_ops {
+    () => {
+        use_podn_with!();
+        use std::str::FromStr;
+        use_add_signed!();
+        use std::ops::Sub;
+        use std::ops::SubAssign;
+    }
+}
+
 use_ops! {}
-use super::parse::ParseBigError;
-use rug::Integer;
 use super::parse::{*};
-use std::cmp::PartialOrd;
-use std::cmp::Ordering;
 
 pub trait IsNegative {
     fn is_negative(&self) -> bool;
-}
-
-impl IsNegative for Integer {
-    fn is_negative(&self) -> bool {
-        self < &0
-    }
 }
 
 pub trait AssertNotNegative {
@@ -35,14 +49,6 @@ pub trait FromStrRadix where
     fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseBigError>;
 }
 
-impl FromStrRadix for Integer {
-    fn from_str_radix(s: &str, radix: u32) -> Result<Self, ParseBigError> {
-        match Integer::from_str_radix(s, radix as i32) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(ParseBigError {kind: LibError(e.to_string())}),
-        }
-    }
-}
 
 pub trait Lower {}
 impl Lower for u8 {}
@@ -51,9 +57,8 @@ impl Lower for u32 {}
 impl Lower for u64 {}
 impl Lower for u128 {}
 impl Lower for usize {}
-impl Lower for Integer {}
 
-pub trait Primitive where Self: Lower {} 
+trait Primitive where Self: Lower {} 
 impl Primitive for u8 {}
 impl Primitive for u16 {}
 impl Primitive for u32 {}
@@ -61,7 +66,7 @@ impl Primitive for u64 {}
 impl Primitive for u128 {}
 impl Primitive for usize {}
 
-pub struct PodN<T>(T);
+pub struct PodN<T>(pub(super) T);
 
 impl<T> IsNegative for PodN<T> 
     where T: IsNegative
@@ -131,78 +136,57 @@ impl<U, T> AddAssign<PodN<U>> for PodN<T> where
 
 
 pub trait Signed {}
-impl Signed for Integer {}
 
-// impl<U, T> Add<U> for PodN<T> where
-//     T: Add<U, Output = T>,
-//     U: Integer,
-// {
-//     type Output = Self;
-//     
-//     fn add(self, other: U) -> Self {
-//         let newv = self.0.add(other);
-//         newv.assert_not_negative();
-//         return Self(newv);
-//     }
-// }
-// 
-// impl<U, T> AddAssign<U> for PodN<T> where
-//     T: AddAssign<U>, 
-//     U: Signed,
-// {
-//     fn add_assign(&mut self, other: U) {
-//         self.0 += other;
-//         self.0.assert_not_negative();
-//     }
-// }
+macro_rules! add_signed { ($U:ty) => {
 
-impl<T> AddAssign<PodN<Integer>> for PodN<T> where
-    T: Lower,
-    T: AddAssign<Integer>, 
-    T: AssertNotNegative,
-{
-    fn add_assign(&mut self, other: PodN<Integer>) {
-        self.0 += other.0;
-        self.0.assert_not_negative();
+    impl<T> AddAssign<PodN<$U>> for PodN<T> where
+        T: Lower,
+        T: AddAssign<$U>, 
+        T: AssertNotNegative,
+    {
+        fn add_assign(&mut self, other: PodN<$U>) {
+            self.0 += other.0;
+            self.0.assert_not_negative();
+        }
     }
-}
 
-impl<T> AddAssign<Integer> for PodN<T> where
-    T: Lower,
-    T: AddAssign<Integer>, 
-    T: AssertNotNegative,
-{
-    fn add_assign(&mut self, other: Integer) {
-        self.0 += other;
-        self.0.assert_not_negative();
+    impl<T> AddAssign<$U> for PodN<T> where
+        T: Lower,
+        T: AddAssign<$U>, 
+        T: AssertNotNegative,
+    {
+        fn add_assign(&mut self, other: $U) {
+            self.0 += other;
+            self.0.assert_not_negative();
+        }
     }
-}
 
-impl<T> Add<Integer> for PodN<T> where
-    T: Add<Integer, Output = T>,
-    T: AssertNotNegative,
-{
-    type Output = Self;
-    
-    fn add(self, other: Integer) -> Self {
-        let newv = self.0.add(other);
-        newv.assert_not_negative();
-        return Self(newv);
+    impl<T> Add<$U> for PodN<T> where
+        T: Add<$U, Output = T>,
+        T: AssertNotNegative,
+    {
+        type Output = Self;
+        
+        fn add(self, other: $U) -> Self {
+            let newv = self.0.add(other);
+            newv.assert_not_negative();
+            return Self(newv);
+        }
     }
-}
 
-impl<T> Add<PodN<Integer>> for PodN<T> where
-    T: Add<Integer, Output = T>,
-    T: AssertNotNegative,
-{
-    type Output = Self;
-    
-    fn add(self, other: PodN<Integer>) -> Self {
-        let newv = self.0.add(other.0);
-        newv.assert_not_negative();
-        return Self(newv);
+    impl<T> Add<PodN<$U>> for PodN<T> where
+        T: Add<$U, Output = T>,
+        T: AssertNotNegative,
+    {
+        type Output = Self;
+        
+        fn add(self, other: PodN<$U>) -> Self {
+            let newv = self.0.add(other.0);
+            newv.assert_not_negative();
+            return Self(newv);
+        }
     }
-}
+}}
 
 impl<U, T> Sub<U> for PodN<T> where 
     T: Sub<U, Output = T>,
@@ -252,8 +236,7 @@ impl<U, T> SubAssign<PodN<U>> for PodN<T> where
     }
 }
 
-
-macro_rules! use_with {
+macro_rules! podn_with {
     ($U:ty) => {
         impl<T: PartialEq<$U>> PartialEq<$U> for PodN<T> {
             fn eq(&self, other: &$U) -> bool {
@@ -280,17 +263,16 @@ macro_rules! use_with {
 }
 
 
-use_with!(u8);
-use_with!(u16);
-use_with!(u32);
-use_with!(u64);
-use_with!(u128);
-use_with!(usize);
-use_with!(Integer);
+podn_with!(u8);
+podn_with!(u16);
+podn_with!(u32);
+podn_with!(u64);
+podn_with!(u128);
+podn_with!(usize);
 // #[cfg(target_pointer_width = "32")]
-// use_with! { usize as u32 }
+// podn_with! { usize as u32 }
 // #[cfg(target_pointer_width = "64")]
-// use_with! { usize as u64 }
+// podn_with! { usize as u64 }
 
 
 impl<T: FromStrRadix> FromStrRadix for PodN<T>
@@ -319,6 +301,7 @@ impl<T: FromStrRadix> FromStr for PodN<T>
 
 #[cfg(feature="trace_macros")]
 trace_macros!(true);
+// log_syntax!(true);
 
 macro_rules! make_podly_trait_ops {
     ($d:tt $($R:ident),*) => {
@@ -340,18 +323,35 @@ macro_rules! make_podly_trait_ops {
 }
 
 make_podly_trait_ops! {$ Add, AddAssign, Sub, SubAssign}
-make_podly_trait_types! {u8, u16, u32, u64, u128, Integer}
+make_podly_trait_types! {u8, u16, u32, u64, u128}
 
-// impl SubAssign<usize> for PodN<Integer> {
-//     #[cfg(target_pointer_width = "32")]
-//     fn sub_assign(&mut self, other: Self) {
-//         self.0 -= other as u32;
-//     }
-//     #[cfg(target_pointer_width = "64")]
-//     fn sub_assign(&mut self, other: Self) {
-//         self.0 -= other as u64;
-//     }
-// }
+macro_rules! make_interpod_trait_ops {
+    ($d:tt $($R:ident),*) => {
+        macro_rules! make_interpod_trait_primitives {
+            ($d2:tt $d($d T:ty),*) => {
+                macro_rules! make_interpod_trait_types {
+                    ($d2($d2 U:ty),*) => {
+                        pub trait Interpod: FromStr
+                            $(+ $R)*
+                            $d(
+                                + From<$T>
+                                $(+ $R<$T>)*
+                            )*
+                            $d2(
+                                + From<$U>
+                                $(+ $R<$U>)*
+                            )*
+                            where 
+                                Self: std::marker::Sized,
+                                PodN<Self>: FromStrRadix,
+                        {}
+                    }
+                }
+            }
+        }
+    }
+}
 
-impl Podly for PodN<Integer> {}
+make_interpod_trait_ops!($ Add, AddAssign, Sub, SubAssign);
+make_interpod_trait_primitives!($ u8, u16, u32, u64, u128);
 
