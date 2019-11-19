@@ -25,7 +25,7 @@ macro_rules! use_ops {
 }
 
 use_ops! {}
-use super::parse::{*};
+use super::errors::{*};
 
 pub trait IsNegative {
     fn is_negative(&self) -> bool;
@@ -48,7 +48,6 @@ pub trait FromStrRadix where
 {
     fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseBigError>;
 }
-
 
 pub trait Lower {}
 impl Lower for u8 {}
@@ -109,17 +108,6 @@ impl<U, T> Add<PodN<U>> for PodN<T> where
     
     fn add(self, other: PodN<U>) -> Self {
         return Self(self.0.add(other.0));
-    }
-}
-
-impl<U, T> AddAssign<U> for PodN<T> where
-    T: Lower,
-    T: AddAssign<U>, 
-    U: Lower,
-    U: Unsigned,
-{
-    fn add_assign(&mut self, other: U) {
-        self.0 += other;
     }
 }
 
@@ -215,16 +203,25 @@ impl<U, T> Sub<PodN<U>> for PodN<T> where
     }
 }
 
-impl<U, T> SubAssign<U> for PodN<T> where
-    T: SubAssign<U>,
-    T: AssertNotNegative,
-    U: Lower,
-{
-    fn sub_assign(&mut self, other: U) {
-        self.0 -= other;
-        self.0.assert_not_negative();
+macro_rules! wrapped_arithmetic {
+    ($T:ty, $U:ty) => {
+        impl SubAssign<$U> for PodN<$T>
+        {
+            fn sub_assign(&mut self, other: $U) {
+                self.0 -= other;
+                self.0.assert_not_negative();
+            }
+        }
+        
+        impl AddAssign<$U> for PodN<$T>
+        {
+            fn add_assign(&mut self, other: $U) {
+                self.0 += other;
+            }
+        }
     }
 }
+
 
 impl<U, T> SubAssign<PodN<U>> for PodN<T> where
     T: SubAssign<U>,
@@ -323,7 +320,7 @@ macro_rules! make_podly_trait_ops {
 }
 
 make_podly_trait_ops! {$ Add, AddAssign, Sub, SubAssign}
-make_podly_trait_types! {u8, u16, u32, u64, u128}
+make_podly_trait_types! {u8, u16, u32, u64, u128, usize}
 
 macro_rules! make_interpod_trait_ops {
     ($d:tt $($R:ident),*) => {

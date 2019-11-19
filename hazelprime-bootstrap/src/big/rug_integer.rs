@@ -1,10 +1,14 @@
 #![warn(rust_2018_idioms)]
 
-use super::pod::{*};
 use super::parse::{*};
-use super::{*};
+use super::sign::{*};
+use super::natural::{*};
 
-pub use ::rug::Integer as RugInteger;
+use rug::Integer as RugInteger;
+
+use_arith!();
+
+impl Signed for RugInteger {}
 
 impl IsNegative for RugInteger {
     fn is_negative(&self) -> bool {
@@ -21,29 +25,60 @@ impl FromStrRadix for RugInteger {
     }
 }
 
-impl Lower for RugInteger {}
+impl NotWrapped for RugInteger {}
 
-impl Signed for RugInteger {}
+natural_from_unsigned!(RugInteger, u8);
+natural_from_unsigned!(RugInteger, u16);
+natural_from_unsigned!(RugInteger, u32);
+natural_from_unsigned!(RugInteger, u64);
+natural_from_unsigned!(RugInteger, u128);
+natural_from_unsigned!(RugInteger, usize);
+natural_from!(RugInteger, RugInteger);
 
-use_add_signed!();
-add_signed!(RugInteger);
+arithmetic_with_unsigned!(RugInteger, u8);
+arithmetic_with_unsigned!(RugInteger, u16);
+arithmetic_with_unsigned!(RugInteger, u32);
+arithmetic_with_unsigned!(RugInteger, u64);
+arithmetic_with_unsigned!(RugInteger, u128);
+arithmetic_with_signed!(RugInteger, RugInteger);
+arithmetic_with_self!(RugInteger);
 
-use_podn_with!();
-podn_with!(RugInteger);
+macro_rules! size_plain_op {
+    ($T:ident, $f:tt) => {
+        impl $T<usize> for WrappedNatural<RugInteger> where
+        {
+            type Output = Self;
+            
+            fn $f(self, other: usize) -> Self::Output {
+                #[cfg(target_pointer_width="32")]
+                let o: u32 = other as u32;
+                #[cfg(target_pointer_width="64")]
+                let o: u64 = other as u64;
+                return Self((self.0).$f(o));
+            }
+        }
+    }
+}
 
-// impl SubAssign<usize> for PodN<RugInteger> where
-// {
-//     fn sub_assign(&mut self, other: usize) {
-//         #[cfg(target_pointer_width="32")]
-//         let o: u32 = other as u32;
-//         #[cfg(target_pointer_width="64")]
-//         let o: u64 = other as u64;
-//         self.0 -= o;
-//         self.0.assert_not_negative();
-//     }
-// }
+macro_rules! size_assign_op {
+    ($T:ident, $f:tt) => {
+        impl $T<usize> for WrappedNatural<RugInteger> where
+        {
+            fn $f(&mut self, other: usize) {
+                #[cfg(target_pointer_width="32")]
+                let o: u32 = other as u32;
+                #[cfg(target_pointer_width="64")]
+                let o: u64 = other as u64;
+                (self.0).$f(o);
+            }
+        }
+    }
+}
 
-impl Podly for PodN<RugInteger> {}
+size_plain_op!(Add, add);
+size_assign_op!(AddAssign, add_assign);
+size_plain_op!(Sub, sub);
+size_assign_op!(SubAssign, sub_assign);
 
-impl Interpod for PodN<RugInteger> {}
+impl Natural for WrappedNatural<RugInteger> {}
 

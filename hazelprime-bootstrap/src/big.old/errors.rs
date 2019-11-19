@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FmtResult;
+use std::fmt::Result;
 
 #[derive(Debug)]
 pub(super) enum BigParseErrorKind {
@@ -28,18 +28,11 @@ impl Error for ParseBigError {
 }
 
 impl Display for ParseBigError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.kind {
             LibError(d) => write!(f, "{}: {}", self.description(), d),
             Underflow => write!(f, "{}", self.description()),
         }
     }
 }
-
-pub trait FromStrRadix where
-    Self: std::marker::Sized,
-{
-    fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseBigError>;
-}
-
 
